@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Examen de práctica · Economía</title>
+<meta name="description" content="Examen de práctica autocorregible: economía positiva y normativa, micro y macro, modelos, problema económico y variables.">
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --text: #1d2330;
+    --muted: #5d6677;
+    --border: #dde1e8;
+    --primary: #2556c4;
+    --primary-soft: #e8eefb;
+    --ok: #1b7f4b;
+    --ok-soft: #e4f4ea;
+    --bad: #c23030;
+    --bad-soft: #fbe8e8;
+    --warn: #a86400;
+    --shadow: 0 1px 3px rgba(20, 30, 50, .08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151b;
+      --card: #1b1f27;
+      --text: #e6e9ef;
+      --muted: #9aa3b4;
+      --border: #2d333f;
+      --primary: #7aa2ff;
+      --primary-soft: #222c44;
+      --ok: #5fcf8f;
+      --ok-soft: #1a3226;
+      --bad: #ff7b7b;
+      --bad-soft: #3a1f22;
+      --warn: #f0b24a;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12151b; --card: #1b1f27; --text: #e6e9ef; --muted: #9aa3b4; --border: #2d333f;
+    --primary: #7aa2ff; --primary-soft: #222c44; --ok: #5fcf8f; --ok-soft: #1a3226;
+    --bad: #ff7b7b; --bad-soft: #3a1f22; --warn: #f0b24a; --shadow: none;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 24px 16px 80px; }
+
+  header h1 { margin: 0 0 4px; font-size: 1.7rem; line-height: 1.2; }
+  header p { margin: 0; color: var(--muted); }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 20px;
+    box-shadow: var(--shadow);
+  }
+  .intro ul { margin: 8px 0 0; padding-left: 20px; color: var(--muted); }
+  .field { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+  .field label { font-weight: 600; font-size: .95rem; }
+  input[type="text"] {
+    font: inherit;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    width: 100%;
+    max-width: 360px;
+  }
+  input[type="text"]:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+  .progress {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--bg);
+    padding: 12px 0 10px;
+    margin-top: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .progress-row { display: flex; justify-content: space-between; font-size: .9rem; color: var(--muted); }
+  .bar { height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; margin-top: 6px; }
+  .bar > span { display: block; height: 100%; width: 0; background: var(--primary); transition: width .2s; }
+
+  .ex-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .ex-num {
+    font-size: .8rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--primary); background: var(--primary-soft);
+    padding: 3px 10px; border-radius: 99px;
+  }
+  .ex-head h2 { margin: 0; font-size: 1.25rem; }
+  .consigna { color: var(--muted); margin: 8px 0 4px; }
+  .datos { border-collapse: collapse; margin: 10px 0 4px; font-size: .95rem; }
+  .datos th, .datos td { border: 1px solid var(--border); padding: 6px 12px; text-align: right; }
+  .datos th { background: var(--primary-soft); }
+  .datos td:first-child, .datos th:first-child { text-align: left; }
+
+  .item { border-top: 1px solid var(--border); padding: 16px 0 6px; }
+  .item:first-of-type { border-top: none; }
+  .q { margin: 0 0 10px; font-weight: 500; }
+  .q .n { color: var(--muted); font-weight: 700; margin-right: 6px; }
+
+  .opts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .opts.stack { flex-direction: column; }
+  .opt { position: relative; }
+  .opt input { position: absolute; opacity: 0; pointer-events: none; }
+  .opt span {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+    background: var(--card);
+    transition: border-color .15s, background .15s;
+  }
+  .opt span:hover { border-color: var(--primary); }
+  .opt input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .opt input:checked + span { border-color: var(--primary); background: var(--primary-soft); font-weight: 600; }
+  .opt input:disabled + span { cursor: default; }
+  .opt input:disabled + span:hover { border-color: var(--border); }
+  .opt input:checked:disabled + span:hover { border-color: var(--primary); }
+
+  .num-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .num-row input { max-width: 180px; }
+  .num-row .unit { color: var(--muted); }
+
+  .item.ok .q::before, .item.bad .q::before {
+    display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center;
+    border-radius: 50%; margin-right: 8px; font-size: .8rem; font-weight: 700; color: #fff;
+  }
+  .item.ok .q::before { content: "✓"; background: var(--ok); }
+  .item.bad .q::before { content: "✗"; background: var(--bad); }
+  .item.ok .opt input:checked + span { border-color: var(--ok); background: var(--ok-soft); }
+  .item.bad .opt input:checked + span { border-color: var(--bad); background: var(--bad-soft); }
+  .item .opt.correct span { border-color: var(--ok); border-style: dashed; }
+
+  .fb {
+    margin: 10px 0 6px; padding: 10px 14px; border-radius: 8px; font-size: .95rem;
+    border-left: 4px solid;
+  }
+  .item.ok .fb { background: var(--ok-soft); border-color: var(--ok); }
+  .item.bad .fb { background: var(--bad-soft); border-color: var(--bad); }
+  .fb strong { display: block; margin-bottom: 2px; }
+  .fb .exp { color: var(--text); margin-top: 4px; }
+
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
+  button {
+    font: inherit; font-weight: 600;
+    border-radius: 8px; padding: 11px 20px; cursor: pointer;
+    border: 1px solid var(--primary);
+    background: var(--primary); color: #fff;
+  }
+  button.secondary { background: transparent; color: var(--primary); }
+  button:hover { filter: brightness(1.08); }
+
+  #resultado { display: none; }
+  #resultado.show { display: block; }
+  .nota-box { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .nota {
+    font-size: 3.2rem; font-weight: 800; line-height: 1;
+    min-width: 110px; text-align: center;
+    padding: 16px 10px; border-radius: 12px;
+  }
+  .nota.aprobado { color: var(--ok); background: var(--ok-soft); }
+  .nota.desaprobado { color: var(--bad); background: var(--bad-soft); }
+  .nota small { display: block; font-size: .8rem; font-weight: 600; margin-top: 6px; letter-spacing: .04em; }
+  .nota-info h2 { margin: 0 0 4px; }
+  .nota-info p { margin: 0; color: var(--muted); }
+  .resumen { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: .95rem; }
+  .resumen td { padding: 8px 0; border-top: 1px solid var(--border); vertical-align: middle; }
+  .resumen td:last-child { text-align: right; white-space: nowrap; padding-left: 12px; font-variant-numeric: tabular-nums; }
+  .mini { height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; margin-top: 4px; }
+  .mini span { display: block; height: 100%; background: var(--ok); }
+
+  body.solo-errores .item.ok { display: none; }
+  body.solo-errores .ex.sin-errores { display: none; }
+
+  footer { margin-top: 40px; color: var(--muted); font-size: .85rem; text-align: center; }
+
+  @media (max-width: 560px) {
+    header h1 { font-size: 1.4rem; }
+    .card { padding: 16px; }
+    .opts:not(.stack) .opt { flex: 1 1 auto; }
+    .opts:not(.stack) .opt span { text-align: center; }
+    .nota { font-size: 2.6rem; }
+  }
+  @media print {
+    .progress, .actions, .intro { display: none !important; }
+    .card { break-inside: avoid; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Examen de práctica · Economía</h1>
+    <p>Ramas de la economía · Modelos y sistemas · Problema económico · Variables</p>
+  </header>
+
+  <section class="card intro">
+    <strong>Instrucciones</strong>
+    <ul>
+      <li>El examen tiene <strong>6 ejercicios</strong>. Respondé todas las preguntas.</li>
+      <li>En las preguntas numéricas podés usar coma o punto para los decimales (ej.: 108,33).</li>
+      <li>Al final presioná <strong>“Corregir examen”</strong>: vas a ver tu nota, los aciertos, los errores y la explicación de cada respuesta.</li>
+      <li>Podés volver a intentarlo las veces que quieras; las preguntas cambian de orden.</li>
+    </ul>
+    <div class="field">
+      <label for="alumno">Nombre y apellido</label>
+      <input type="text" id="alumno" autocomplete="name" placeholder="Escribí tu nombre">
+    </div>
+  </section>
+
+  <section id="resultado" class="card" aria-live="polite"></section>
+
+  <div class="progress" id="progress">
+    <div class="progress-row"><span>Progreso</span><span id="progress-txt">0 / 0 respondidas</span></div>
+    <div class="bar"><span id="progress-bar"></span></div>
+  </div>
+
+  <form id="examen" novalidate></form>
+
+  <div class="actions" id="acciones">
+    <button type="button" id="btn-corregir">Corregir examen</button>
+  </div>
+
+  <footer>Examen de práctica · Economía — Nivel terciario</footer>
+</div>
+
+<script>
+/* ============================================================
+   CONFIGURACIÓN
+   ============================================================ */
+const NOTA_APROBACION = 6;   // nota mínima para aprobar (escala 1 a 10)
+const MEZCLAR = true;        // mezclar orden de preguntas y opciones en cada intento
+
+/* ============================================================
+   BANCO DE PREGUNTAS
+   Tipos:
+     - choice: opciones (a = texto de la opción correcta)
+     - num:    respuesta numérica (a = valor, tol = tolerancia,
+               alt = otros valores aceptados)
+   inline: true -> opciones en fila (para clasificar). Si no, en columna.
+   ============================================================ */
+const POS_NOR = ["Positiva", "Normativa"];
+const MIC_MAC = ["Microeconomía", "Macroeconomía"];
+const SISTEMAS = ["Capitalista", "Socialista", "Economía mixta"];
+const NRB = ["Necesidad", "Recurso", "Bien"];
+const LIB_ECO = ["Bien libre", "Bien económico"];
+const EXO_END = ["Exógena", "Endógena"];
+const FLU_STO = ["Flujo", "Stock"];
+
+const EXAMEN = [
+  {
+    titulo: "Economía positiva y normativa",
+    consigna: "Indicá si cada enunciado corresponde a la economía positiva (lo que ES) o a la economía normativa (lo que DEBERÍA SER).",
+    items: [
+      { t: "choice", inline: true, opts: POS_NOR, a: "Normativa",
+        q: "“Todas las empresas deben destinar parte de sus ganancias a obras de bien común en su comunidad.”",
+        exp: "Expresa un juicio de valor sobre cómo deberían actuar las empresas (“deben”)." },
+      { t: "choice", inline: true, opts: POS_NOR, a: "Positiva",
+        q: "“Cuando los precios de un producto bajan, los consumidores compran más de ese producto.”",
+        exp: "Describe un comportamiento objetivo que puede comprobarse (ley de la demanda). No opina." },
+      { t: "choice", inline: true, opts: POS_NOR, a: "Positiva",
+        q: "“Si el gobierno no disminuye el gasto exagerado, probablemente se desatará una crisis interna.”",
+        exp: "Es una relación causa-efecto que puede verificarse (lo que “podría ser”); no dice qué es bueno o malo." },
+      { t: "choice", inline: true, opts: POS_NOR, a: "Normativa",
+        q: "“El precio de la leche debería aumentar para permitir un nivel de vida más alto a los productores de leche.”",
+        exp: "El “debería” marca una recomendación basada en una opinión sobre lo deseable." },
+      { t: "choice", inline: true, opts: POS_NOR, a: "Positiva",
+        q: "“La tasa de desempleo en Argentina fue del 7% durante el último trimestre.”",
+        exp: "Es un dato que describe la realidad y puede comprobarse con estadísticas." },
+      { t: "choice", inline: true, opts: POS_NOR, a: "Normativa",
+        q: "“La tasa de interés debería bajar para impulsar la producción nacional.”",
+        exp: "Propone una medida de política económica: es lo que alguien considera que debería hacerse." },
+    ],
+  },
+  {
+    titulo: "Microeconomía y macroeconomía",
+    consigna: "Indicá si el tema de cada titular o situación lo estudia la microeconomía o la macroeconomía.",
+    items: [
+      { t: "choice", inline: true, opts: MIC_MAC, a: "Microeconomía",
+        q: "“Por la avalancha de compras, subió la carne en San Juan: el kilo de asado pasará de $350 a $365.”",
+        exp: "Analiza el precio de un bien puntual en un mercado determinado: es microeconomía." },
+      { t: "choice", inline: true, opts: MIC_MAC, a: "Macroeconomía",
+        q: "“El Gobierno anunció un paquete de medidas: créditos, obra pública y seguro de desempleo para proteger la producción y el trabajo.”",
+        exp: "Son medidas que apuntan al empleo y a la producción del país en su conjunto." },
+      { t: "choice", inline: true, opts: MIC_MAC, a: "Macroeconomía",
+        q: "“La inflación anual del país se ubicó en el 30%.”",
+        exp: "La inflación es una variable agregada: refleja la evolución del nivel general de precios de toda la economía." },
+      { t: "choice", inline: true, opts: MIC_MAC, a: "Microeconomía",
+        q: "“Una panadería analiza cuánto pan producir según el precio de la harina.”",
+        exp: "Es la decisión de una empresa individual (unidad básica de la economía)." },
+      { t: "choice", inline: true, opts: MIC_MAC, a: "Macroeconomía",
+        q: "“La balanza comercial registró superávit gracias al aumento de las exportaciones.”",
+        exp: "La balanza comercial (exportaciones e importaciones del país) es un tema típico de la macroeconomía." },
+      { t: "choice", inline: true, opts: MIC_MAC, a: "Microeconomía",
+        q: "“Una familia decide qué parte de su sueldo ahorrar y qué parte consumir.”",
+        exp: "Estudia el comportamiento de una unidad individual (la familia): cuánto ahorrar y cuánto consumir." },
+      { t: "choice", opts: [
+          "Una variable que se forma con otras variables, como la producción de todas las empresas, familias y sector público de un país.",
+          "Una variable que solo afecta a una empresa en particular.",
+          "Una variable que no puede medirse.",
+        ], a: "Una variable que se forma con otras variables, como la producción de todas las empresas, familias y sector público de un país.",
+        q: "La macroeconomía estudia variables agregadas. ¿Qué es una variable agregada?",
+        exp: "Las variables agregadas se forman sumando otras variables; por ejemplo, la producción agregada de un país." },
+    ],
+  },
+  {
+    titulo: "Modelos y sistemas económicos",
+    consigna: "Respondé sobre los modelos económicos y luego identificá a qué sistema económico corresponde cada descripción.",
+    items: [
+      { t: "choice", opts: [
+          "Para simplificar la realidad y concentrarse en las variables más importantes.",
+          "Para reproducir la realidad exactamente, con todos sus detalles.",
+          "Porque así el modelo no necesita usar variables.",
+        ], a: "Para simplificar la realidad y concentrarse en las variables más importantes.",
+        q: "¿Por qué los economistas utilizan supuestos al construir un modelo económico?",
+        exp: "Los modelos simplifican la realidad: los supuestos (por ejemplo, “libre mercado”) permiten aislar las variables que determinan el fenómeno." },
+      { t: "choice", opts: [
+          "Tendería a bajar, porque aumenta la oferta de trabajo.",
+          "Tendería a subir, porque aumenta la demanda de trabajo.",
+          "No cambiaría, porque el salario no depende de la oferta.",
+        ], a: "Tendería a bajar, porque aumenta la oferta de trabajo.",
+        q: "En el modelo del salario de los programadores, ¿qué ocurriría con el salario de equilibrio si aumenta repentinamente la cantidad de profesionales calificados?",
+        exp: "La oferta de trabajo depende del número de trabajadores calificados. Si hay más oferentes con la misma demanda, el salario de equilibrio tiende a bajar." },
+      { t: "choice", opts: [
+          "De lo apropiado de los supuestos y de la selección de las variables determinantes.",
+          "De la opinión personal del economista que lo construye.",
+          "De la cantidad de países que lo utilicen.",
+        ], a: "De lo apropiado de los supuestos y de la selección de las variables determinantes.",
+        q: "Las conclusiones que se obtienen de un modelo económico dependen principalmente…",
+        exp: "Así lo plantea el texto: las conclusiones dependen de que los supuestos sean apropiados y de qué variables se eligen." },
+      { t: "choice", inline: true, opts: SISTEMAS, a: "Capitalista",
+        q: "Se basa en la propiedad privada; el mercado asigna los recursos y se promueven la búsqueda de beneficio y la competencia.",
+        exp: "Propiedad privada + asignación por el mercado + competencia = modelo capitalista." },
+      { t: "choice", inline: true, opts: SISTEMAS, a: "Socialista",
+        q: "Defiende la propiedad pública, la planificación de la economía, el reparto igualitario de la riqueza y la justicia social.",
+        exp: "Propiedad pública + planificación = modelo socialista." },
+      { t: "choice", inline: true, opts: SISTEMAS, a: "Economía mixta",
+        q: "Combina sector privado y sector público: la oferta y la demanda definen el mercado y el Estado corrige sus fallas con impuestos y subvenciones.",
+        exp: "La combinación de ambos sectores, con un Estado corrector, define a la economía mixta." },
+      { t: "choice", inline: true, opts: SISTEMAS, a: "Economía mixta",
+        q: "¿Cuál es el sistema económico más utilizado en la actualidad?",
+        exp: "Según el texto, las economías mixtas son el sistema más utilizado." },
+    ],
+  },
+  {
+    titulo: "El problema económico: necesidades, recursos y bienes",
+    consigna: "Clasificá cada elemento y luego respondé las preguntas sobre la escasez.",
+    items: [
+      { t: "choice", inline: true, opts: NRB, a: "Necesidad",
+        q: "La sensación de hambre.",
+        exp: "Es una sensación de carencia unida al deseo de satisfacerla: una necesidad." },
+      { t: "choice", inline: true, opts: NRB, a: "Recurso",
+        q: "Las maquinarias, herramientas y vehículos de una empresa.",
+        exp: "Se usan para producir otros bienes: son recursos (recurso de capital)." },
+      { t: "choice", inline: true, opts: NRB, a: "Bien",
+        q: "Una campera.",
+        exp: "Es un objeto que resulta de combinar recursos y satisface directamente la necesidad de abrigo." },
+      { t: "choice", inline: true, opts: NRB, a: "Recurso",
+        q: "La fuerza de trabajo y el tiempo que dedica un minero a su tarea.",
+        exp: "Es un recurso humano: se usa para producir." },
+      { t: "choice", inline: true, opts: NRB, a: "Necesidad",
+        q: "Estar en contacto con otras personas (comunicación).",
+        exp: "Es una carencia que las personas desean satisfacer: una necesidad." },
+      { t: "choice", inline: true, opts: NRB, a: "Bien",
+        q: "Un teléfono celular con conexión a internet.",
+        exp: "Es el bien que satisface la necesidad de comunicación." },
+      { t: "choice", inline: true, opts: LIB_ECO, a: "Bien libre",
+        q: "La luz del sol.",
+        exp: "La provee la naturaleza en forma abundante, no pertenece a nadie y no tiene precio." },
+      { t: "choice", inline: true, opts: LIB_ECO, a: "Bien económico",
+        q: "El agua potable tratada que llega por red.",
+        exp: "Requiere trabajo, tecnología y recursos para obtenerla, y tiene un precio." },
+      { t: "choice", inline: true, opts: LIB_ECO, a: "Bien libre",
+        q: "El aire que respiramos en la atmósfera.",
+        exp: "Es abundante e ilimitado, sin dueño y sin precio." },
+      { t: "choice", inline: true, opts: LIB_ECO, a: "Bien económico",
+        q: "El petróleo.",
+        exp: "Es escaso, requiere extracción y procesamiento, y tiene precio de mercado." },
+      { t: "choice", opts: [
+          "El problema de la escasez de los recursos.",
+          "El afán de dinero de los agentes económicos.",
+          "La necesidad de usar tecnología.",
+        ], a: "El problema de la escasez de los recursos.",
+        q: "Las actividades económicas surgen debido a…",
+        exp: "El problema económico es la escasez: necesidades ilimitadas frente a recursos limitados." },
+      { t: "choice", opts: [
+          "Hay que elegir cómo distribuirlos.",
+          "No es necesario administrarlos.",
+          "Solo pueden satisfacer las necesidades básicas.",
+        ], a: "Hay que elegir cómo distribuirlos.",
+        q: "Que los recursos sean escasos implica que…",
+        exp: "Como no alcanzan para todo, hay que elegir y administrar: por eso existe la economía." },
+    ],
+  },
+  {
+    titulo: "Variables en la actividad minera",
+    consigna: "Una empresa minera analiza los factores que influyen sobre su producción. Clasificá las variables y resolvé el caso.",
+    tabla: {
+      cab: ["Mes", "Producción"],
+      filas: [["Enero", "8.000 t"], ["Febrero", "9.000 t"], ["Marzo", "10.000 t"], ["Abril", "7.000 t"]],
+      nota: "Producción mensual de la mina (para la pregunta numérica).",
+    },
+    items: [
+      { t: "choice", inline: true, opts: EXO_END, a: "Exógena",
+        q: "Precio internacional del mineral.",
+        exp: "Se determina en el mercado mundial, fuera del control de la empresa: es una variable explicativa (exógena)." },
+      { t: "choice", inline: true, opts: EXO_END, a: "Exógena",
+        q: "Condiciones climáticas.",
+        exp: "Vienen dadas desde afuera del modelo e influyen sobre la producción: exógena." },
+      { t: "choice", inline: true, opts: EXO_END, a: "Exógena",
+        q: "Costo del combustible.",
+        exp: "La empresa no lo controla; es un dato que explica sus costos y su producción: exógena." },
+      { t: "choice", inline: true, opts: EXO_END, a: "Endógena",
+        q: "Toneladas de mineral producidas.",
+        exp: "Depende de otras variables (horas de máquina, trabajadores, clima, etc.): es la variable explicada (endógena)." },
+      { t: "choice", inline: true, opts: EXO_END, a: "Endógena",
+        q: "Ingresos por ventas de la empresa.",
+        exp: "Dependen del precio internacional y de la cantidad vendida: es una variable dependiente (endógena)." },
+      { t: "choice", opts: [
+          "La variable exógena (independiente), que se ubica en el eje X o de abscisas.",
+          "La variable endógena (dependiente), que se ubica en el eje Y o de ordenadas.",
+          "Una variable stock.",
+        ], a: "La variable exógena (independiente), que se ubica en el eje X o de abscisas.",
+        q: "En la expresión Y = f(X), ¿qué representa X?",
+        exp: "Y = f(X) significa que Y depende de X. X es la variable exógena o explicativa (eje de abscisas)." },
+      { t: "choice", inline: true, opts: FLU_STO, a: "Flujo",
+        q: "15.000 toneladas extraídas durante septiembre.",
+        exp: "Es una cantidad medida a lo largo de un período (septiembre): flujo." },
+      { t: "choice", inline: true, opts: FLU_STO, a: "Stock",
+        q: "80.000 toneladas almacenadas al 30/09.",
+        exp: "Es una cantidad medida en un momento determinado (al 30/09): stock." },
+      { t: "choice", inline: true, opts: FLU_STO, a: "Flujo",
+        q: "$120 millones invertidos durante el año.",
+        exp: "La inversión se mide a lo largo de un período (el año): flujo." },
+      { t: "choice", inline: true, opts: FLU_STO, a: "Stock",
+        q: "Valor de las maquinarias al 30/09.",
+        exp: "Es el capital acumulado a una fecha determinada: stock." },
+      { t: "choice", inline: true, opts: FLU_STO, a: "Flujo",
+        q: "Durante el año se incorporaron 40 nuevos trabajadores.",
+        exp: "Mide cuántos se incorporaron en un período (durante el año): flujo." },
+      { t: "num", a: 34000, tol: 0.5, unidad: "toneladas",
+        q: "Según la tabla, ¿cuál fue la producción total entre enero y abril?",
+        exp: "8.000 + 9.000 + 10.000 + 7.000 = 34.000 toneladas. Al sumar flujos de varios meses obtenemos el flujo del período." },
+    ],
+  },
+  {
+    titulo: "Variables nominales y reales",
+    consigna: "Una empresa minera obtuvo los siguientes ingresos. Para obtener el ingreso real, dividí el ingreso nominal por el índice de precios y multiplicá por 100 (resultado en millones de pesos de 2024).",
+    tabla: {
+      cab: ["Año", "Ingresos nominales", "Índice de precios"],
+      filas: [["2024", "$100 millones", "100"], ["2025", "$130 millones", "120"], ["2026", "$156 millones", "130"]],
+    },
+    items: [
+      { t: "num", a: 108.33, tol: 0.1, alt: [1.0833], unidad: "millones",
+        q: "¿Cuál es el ingreso real de 2025? (redondeá a dos decimales)",
+        exp: "130 ÷ 120 × 100 = 108,33 millones de pesos de 2024." },
+      { t: "num", a: 120, tol: 0.05, alt: [1.2], unidad: "millones",
+        q: "¿Cuál es el ingreso real de 2026?",
+        exp: "156 ÷ 130 × 100 = 120 millones de pesos de 2024." },
+      { t: "choice", opts: [
+          "Sí, aumentaron un 56%.",
+          "Sí, aumentaron un 20%.",
+          "No, se mantuvieron constantes.",
+        ], a: "Sí, aumentaron un 56%.",
+        q: "¿Los ingresos nominales aumentaron entre 2024 y 2026? ¿Cuánto?",
+        exp: "De $100 a $156 millones: un aumento nominal del 56%." },
+      { t: "choice", opts: [
+          "Aumentaron un 20%, bastante menos que los nominales, porque parte del aumento se explica por la suba de precios.",
+          "Aumentaron un 56%, igual que los nominales.",
+          "Disminuyeron, porque los precios subieron.",
+        ], a: "Aumentaron un 20%, bastante menos que los nominales, porque parte del aumento se explica por la suba de precios.",
+        q: "¿Qué ocurrió con los ingresos reales entre 2024 y 2026?",
+        exp: "Pasaron de 100 a 120 (+20%). El resto del aumento nominal fue inflación." },
+      { t: "choice", opts: [
+          "No: parte del aumento se debe a la suba de precios; en términos reales los ingresos crecieron aproximadamente un 7,7%.",
+          "Sí: si los ingresos subieron un 40%, la producción también subió un 40%.",
+          "No: los ingresos reales cayeron un 10%.",
+        ], a: "No: parte del aumento se debe a la suba de precios; en términos reales los ingresos crecieron aproximadamente un 7,7%.",
+        q: "Los ingresos de una minera aumentaron un 40% en un año y los precios subieron un 30%. ¿Se puede afirmar que produjo un 40% más de mineral?",
+        exp: "Un aumento de ingresos no implica más producción física. En términos reales: 1,40 ÷ 1,30 ≈ 1,077, es decir, un crecimiento real de aprox. 7,7%. Para saber la producción habría que conocer las toneladas producidas." },
+      { t: "choice", opts: [
+          "Un índice de precios.",
+          "La cantidad de trabajadores de la empresa.",
+          "El stock de maquinarias.",
+        ], a: "Un índice de precios.",
+        q: "¿Qué información es necesaria para transformar una variable nominal en real?",
+        exp: "Se divide el valor nominal de cada período por el índice de precios correspondiente." },
+    ],
+  },
+];
+
+/* ============================================================
+   LÓGICA
+   ============================================================ */
+const $ = (s, el = document) => el.querySelector(s);
+const form = $("#examen");
+const resultado = $("#resultado");
+const acciones = $("#acciones");
+let corregido = false;
+let preguntas = []; // lista plana: { id, ex, item }
+
+function mezclar(arr) {
+  const a = arr.slice();
+  if (!MEZCLAR) return a;
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function el(tag, attrs = {}, ...children) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v;
+    else if (k === "text") n.textContent = v;
+    else n.setAttribute(k, v);
+  }
+  for (const c of children) if (c) n.append(c);
+  return n;
+}
+
+function render() {
+  form.innerHTML = "";
+  preguntas = [];
+  let id = 0;
+
+  EXAMEN.forEach((ex, ei) => {
+    const sec = el("section", { class: "card ex", "data-ex": ei });
+    const head = el("div", { class: "ex-head" },
+      el("span", { class: "ex-num", text: `Ejercicio ${ei + 1}` }),
+      el("h2", { text: ex.titulo }));
+    sec.append(head, el("p", { class: "consigna", text: ex.consigna }));
+
+    if (ex.tabla) {
+      const t = el("table", { class: "datos" });
+      const trh = el("tr");
+      ex.tabla.cab.forEach(c => trh.append(el("th", { text: c })));
+      t.append(trh);
+      ex.tabla.filas.forEach(f => {
+        const tr = el("tr");
+        f.forEach(c => tr.append(el("td", { text: c })));
+        t.append(tr);
+      });
+      sec.append(t);
+    }
+
+    const orden = mezclar(ex.items.map((it, i) => i));
+    orden.forEach((ii, pos) => {
+      const it = ex.items[ii];
+      const qid = `q${id++}`;
+      preguntas.push({ id: qid, ex: ei, item: it });
+
+      const div = el("div", { class: "item", "data-q": qid });
+      const q = el("p", { class: "q" }, el("span", { class: "n", text: `${pos + 1}.` }), document.createTextNode(it.q));
+      div.append(q);
+
+      if (it.t === "choice") {
+        const opts = el("div", { class: "opts" + (it.inline ? "" : " stack"), role: "radiogroup" });
+        const lista = it.inline ? it.opts : mezclar(it.opts);
+        lista.forEach(o => {
+          const input = el("input", { type: "radio", name: qid, value: o });
+          opts.append(el("label", { class: "opt" }, input, el("span", { text: o })));
+        });
+        div.append(opts);
+      } else {
+        const input = el("input", { type: "text", name: qid, inputmode: "decimal", autocomplete: "off", placeholder: "Tu respuesta" });
+        div.append(el("div", { class: "num-row" }, input, el("span", { class: "unit", text: it.unidad || "" })));
+      }
+      sec.append(div);
+    });
+    form.append(sec);
+  });
+
+  corregido = false;
+  document.body.classList.remove("solo-errores");
+  resultado.classList.remove("show");
+  resultado.innerHTML = "";
+  $("#progress").style.display = "";
+  acciones.innerHTML = "";
+  const btn = el("button", { type: "button", text: "Corregir examen" });
+  btn.addEventListener("click", corregir);
+  acciones.append(btn);
+  actualizarProgreso();
+}
+
+function respuesta(p) {
+  if (p.item.t === "choice") {
+    const r = form.querySelector(`input[name="${p.id}"]:checked`);
+    return r ? r.value : null;
+  }
+  const v = form.querySelector(`input[name="${p.id}"]`).value.trim();
+  return v === "" ? null : v;
+}
+
+// Devuelve las interpretaciones posibles de un número escrito por el alumno
+// ("34.000" -> 34000; "108,33" -> 108.33; "1.083" -> 1083 o 1.083)
+function interpretar(txt) {
+  const s = txt.replace(/[\s$]/g, "");
+  const out = [];
+  if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) out.push(Number(s.replace(/\./g, "").replace(",", ".")));
+  if (/^-?\d+([.,]\d+)?$/.test(s)) out.push(Number(s.replace(",", ".")));
+  return out.filter(n => Number.isFinite(n));
+}
+
+function esCorrecta(p, r) {
+  if (r === null) return false;
+  const it = p.item;
+  if (it.t === "choice") return r === it.a;
+  const validos = [it.a, ...(it.alt || [])];
+  const tol = it.tol ?? 0;
+  // Los valores alternativos (ej. 1,0833 en lugar de 108,33) usan una tolerancia proporcional
+  return interpretar(r).some(n => validos.some(v =>
+    Math.abs(n - v) <= (v === it.a ? tol : Math.max(tol * v / it.a, 0.005))));
+}
+
+function fmt(n) {
+  return n.toLocaleString("es-AR", { maximumFractionDigits: 2 });
+}
+
+function actualizarProgreso() {
+  const total = preguntas.length;
+  const resp = preguntas.filter(p => respuesta(p) !== null).length;
+  $("#progress-txt").textContent = `${resp} / ${total} respondidas`;
+  $("#progress-bar").style.width = `${total ? (resp / total) * 100 : 0}%`;
+}
+
+function corregir() {
+  const sinResponder = preguntas.filter(p => respuesta(p) === null).length;
+  if (sinResponder > 0 && !confirm(`Te faltan ${sinResponder} pregunta(s) sin responder. Se contarán como incorrectas.\n\n¿Querés corregir igual?`)) return;
+
+  corregido = true;
+  const porEx = EXAMEN.map(() => ({ ok: 0, total: 0 }));
+  let aciertos = 0;
+
+  preguntas.forEach(p => {
+    const r = respuesta(p);
+    const ok = esCorrecta(p, r);
+    porEx[p.ex].total++;
+    if (ok) { porEx[p.ex].ok++; aciertos++; }
+
+    const div = form.querySelector(`[data-q="${p.id}"]`);
+    div.classList.add(ok ? "ok" : "bad");
+    div.querySelectorAll("input").forEach(i => { i.disabled = true; });
+
+    const correcta = p.item.t === "choice" ? p.item.a : `${fmt(p.item.a)} ${p.item.unidad || ""}`.trim();
+    if (!ok && p.item.t === "choice") {
+      div.querySelectorAll(".opt").forEach(o => {
+        if (o.querySelector("input").value === p.item.a) o.classList.add("correct");
+      });
+    }
+
+    const fb = el("div", { class: "fb" });
+    if (ok) {
+      fb.append(el("strong", { text: "¡Correcto!" }));
+    } else {
+      fb.append(el("strong", { text: r === null ? "Sin responder" : "Incorrecto" }));
+      if (r !== null) fb.append(el("div", { text: `Tu respuesta: ${r}` }));
+      fb.append(el("div", { text: `Respuesta correcta: ${correcta}` }));
+    }
+    fb.append(el("div", { class: "exp", text: p.item.exp }));
+    div.append(fb);
+  });
+
+  porEx.forEach((e, i) => {
+    form.querySelector(`[data-ex="${i}"]`).classList.toggle("sin-errores", e.ok === e.total);
+  });
+
+  const total = preguntas.length;
+  const nota = Math.max(1, Math.round((aciertos / total) * 100) / 10);
+  const aprobado = nota >= NOTA_APROBACION;
+  const nombre = $("#alumno").value.trim();
+
+  resultado.innerHTML = "";
+  const box = el("div", { class: "nota-box" },
+    el("div", { class: "nota " + (aprobado ? "aprobado" : "desaprobado") },
+      document.createTextNode(fmt(nota)),
+      el("small", { text: aprobado ? "APROBADO" : "DESAPROBADO" })),
+    el("div", { class: "nota-info" },
+      el("h2", { text: nombre ? `Resultado de ${nombre}` : "Tu resultado" }),
+      el("p", { text: `${aciertos} aciertos y ${total - aciertos} errores sobre ${total} preguntas.` }),
+      el("p", { text: `Nota mínima para aprobar: ${NOTA_APROBACION}.` })));
+  resultado.append(box);
+
+  const tabla = el("table", { class: "resumen" });
+  EXAMEN.forEach((ex, i) => {
+    const e = porEx[i];
+    const mini = el("div", { class: "mini" }, el("span"));
+    mini.firstChild.style.width = `${(e.ok / e.total) * 100}%`;
+    tabla.append(el("tr", {},
+      el("td", {}, el("div", { text: `Ejercicio ${i + 1}: ${ex.titulo}` }), mini),
+      el("td", { text: `${e.ok} / ${e.total}` })));
+  });
+  resultado.append(tabla);
+
+  const acc = el("div", { class: "actions" });
+  const bErr = el("button", { type: "button", class: "secondary", text: "Ver solo errores" });
+  bErr.addEventListener("click", () => {
+    const on = document.body.classList.toggle("solo-errores");
+    bErr.textContent = on ? "Ver todas las preguntas" : "Ver solo errores";
+  });
+  const bImp = el("button", { type: "button", class: "secondary", text: "Imprimir / guardar PDF" });
+  bImp.addEventListener("click", () => window.print());
+  const bRe = el("button", { type: "button", text: "Volver a intentar" });
+  bRe.addEventListener("click", reiniciar);
+  acc.append(bRe, bErr, bImp);
+  resultado.append(acc);
+
+  resultado.classList.add("show");
+  $("#progress").style.display = "none";
+  acciones.innerHTML = "";
+  const bRe2 = el("button", { type: "button", text: "Volver a intentar" });
+  bRe2.addEventListener("click", reiniciar);
+  acciones.append(bRe2);
+
+  resultado.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function reiniciar() {
+  render();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+form.addEventListener("input", () => { if (!corregido) actualizarProgreso(); });
+form.addEventListener("change", () => { if (!corregido) actualizarProgreso(); });
+form.addEventListener("submit", e => e.preventDefault());
+window.addEventListener("beforeunload", e => {
+  if (!corregido && preguntas.some(p => respuesta(p) !== null)) { e.preventDefault(); e.returnValue = ""; }
+});
+
+render();
+</script>
+</body>
+</html>
