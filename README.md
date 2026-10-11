@@ -49,4 +49,4 @@ Subir los cambios a GitHub; Vercel publica solo. No requiere configuración.
 - Hacer una **prueba completa** (agregar un alumno de prueba, habilitar con 2–3 minutos, entrar con ese DNI,
   entregar), luego eliminar ese alumno y usar **Configuración → Borrar todos los exámenes rendidos**.
 - Supabase gratuito **pausa el proyecto tras 7 días sin uso**: entrar al panel el día anterior para mantenerlo activo.
-- Los alumnos pueden registrarse antes de que empiece; conviene pedirles que entren unos minutos antes.
+- Los alumnos pueden ingresar con su DNI antes de que empiece; conviene pedirles que entren unos minutos antes.
