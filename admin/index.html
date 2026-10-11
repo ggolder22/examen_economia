@@ -112,8 +112,8 @@
       <div class="card">
         <h2>Resumen</h2>
         <div class="stats">
-          <div class="stat"><b id="s-reg">0</b><span>Registrados</span></div>
-          <div class="stat"><b id="s-esp">0</b><span>Esperando</span></div>
+          <div class="stat"><b id="s-reg">0</b><span>En la lista</span></div>
+          <div class="stat"><b id="s-esp">0</b><span>Conectados esperando</span></div>
           <div class="stat"><b id="s-ren">0</b><span>Rindiendo</span></div>
           <div class="stat"><b id="s-ent">0</b><span>Entregados</span></div>
           <div class="stat"><b id="s-apr">0</b><span>Aprobados</span></div>
@@ -319,7 +319,9 @@ function estadoAlumno(a) {
   if (a.entregado) return "entregado";
   if (a.tiene_intento) return "rindiendo";
   if (datos && datos.estado === "finalizado") return "ausente";
-  return a.ultimo_acceso ? "esperando" : "sin_ingresar";
+  if (!a.ultimo_acceso) return "sin_ingresar";
+  // En la sala de espera la página consulta cada ~5 s: si hubo actividad reciente, está conectado
+  return ahora() - Date.parse(a.ultimo_acceso) < 60000 ? "esperando" : "desconectado";
 }
 
 function renderControl() {
@@ -409,7 +411,8 @@ function renderAlumnos() {
     else if (est === "rindiendo") {
       const inactivo = a.ultimo_acceso && ahora() - Date.parse(a.ultimo_acceso) > 90000;
       badge = `<span class="badge warn">Rindiendo</span>` + (inactivo ? `<br><small class="muted">sin señal ${esc(hace(a.ultimo_acceso))}</small>` : "");
-    } else if (est === "esperando") badge = `<span class="badge">Esperando</span>`;
+    } else if (est === "esperando") badge = `<span class="badge">Conectado, esperando</span>`;
+    else if (est === "desconectado") badge = `<span class="badge gris">No conectado</span><br><small class="muted">ingresó ${esc(hace(a.ultimo_acceso))}</small>`;
     else if (est === "ausente") badge = `<span class="badge bad">Ausente</span>`;
     else badge = `<span class="badge gris">No ingresó</span>`;
     const notaTxt = a.entregado ? `<strong style="color:var(--${Number(a.nota) >= aprob ? "ok" : "bad"})">${nota(a.nota)}</strong>` : "—";
