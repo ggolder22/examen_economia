@@ -36,6 +36,51 @@
   .det p { margin: 2px 0; }
   .peligro { border-color: var(--bad); }
   td .row { flex-wrap: nowrap; gap: 6px; }
+  .solo-movil { display: none; }
+  .preg-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .preg-cab .row { flex-wrap: nowrap; flex: none; }
+
+  /* ---------- Celular ---------- */
+  @media (max-width: 700px) {
+    .wrap.ancho { padding-top: 16px; }
+    header.row { gap: 6px; }
+    #usuario { width: 100%; justify-content: space-between; }
+    #usuario-email { font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+
+    .tabs { gap: 0; }
+    .tabs button { flex: 1; padding: 10px 4px; font-size: .82rem; white-space: normal; line-height: 1.2; }
+
+    .card > .row > button, #bloque-iniciar button, #bloque-curso button { flex: 1 1 auto; }
+    #btn-finalizar, #btn-iniciar { width: 100%; }
+    #tab-alumnos .card > .row, #tab-alumnos .card > .row > .row { width: 100%; }
+    #tab-alumnos .card > .row > .row > button { flex: 1 1 100%; }
+    #buscar { max-width: none !important; }
+
+    /* Tabla de alumnos como tarjetas */
+    .tabla.cards thead { display: none; }
+    .tabla.cards, .tabla.cards tbody { display: block; }
+    .tabla.cards tr {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px;
+      padding: 14px 0; border-bottom: 1px solid var(--border);
+    }
+    .tabla.cards td { border: none; padding: 0; text-align: left !important; }
+    .tabla.cards td[data-label]::before {
+      content: attr(data-label); display: block;
+      font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
+    }
+    .tabla.cards td.c-nro { display: none; }
+    .tabla.cards td.c-nombre { grid-column: 1 / -1; font-weight: 600; font-size: 1.05rem; }
+    .tabla.cards td.c-acc { grid-column: 1 / -1; }
+    .tabla.cards td.c-acc .row { flex-wrap: wrap; }
+    .tabla.cards td.c-acc button { flex: 1; padding: 9px 10px; }
+    .solo-movil { display: inline; color: var(--muted); }
+
+    .preg-cab { flex-direction: column; }
+    .opcion-edit { flex-wrap: wrap; }
+    .opcion-edit input[type=text] { flex: 1; min-width: 0; }
+    .modal-fondo { padding: 0; }
+    .modal { border-radius: 0; min-height: 100%; }
+  }
 </style>
 </head>
 <body>
@@ -144,7 +189,7 @@
         </div>
         <input type="file" id="archivo-excel" accept=".xlsx" class="hidden">
         <div class="tabla-wrap">
-          <table class="tabla">
+          <table class="tabla cards">
             <thead><tr>
               <th class="num">Nº</th><th>Apellido y nombre</th><th>DNI</th><th>Estado</th>
               <th class="num">Resp.</th><th class="num">Nota</th><th>Entrega</th><th></th>
@@ -212,8 +257,8 @@ let editando = null;       // pregunta en edición (objeto) o null
 
 /* ---------- utilidades ---------- */
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const hora = iso => iso ? new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : "";
-const fechaHora = iso => iso ? new Date(iso).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
+const hora = iso => iso ? new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }) : "";
+const fechaHora = iso => iso ? new Date(iso).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }) : "";
 const nota = n => n == null ? "—" : Number(n).toLocaleString("es-AR", { maximumFractionDigits: 1 });
 const ahora = () => Date.now() + offset;
 
@@ -417,14 +462,14 @@ function renderAlumnos() {
     else badge = `<span class="badge gris">No ingresó</span>`;
     const notaTxt = a.entregado ? `<strong style="color:var(--${Number(a.nota) >= aprob ? "ok" : "bad"})">${nota(a.nota)}</strong>` : "—";
     return `<tr>
-      <td class="num">${a.nro ?? ""}</td>
-      <td>${esc(a.apellido)}, ${esc(a.nombre)}</td>
-      <td>${esc(a.dni)}</td>
-      <td>${badge}</td>
-      <td class="num">${a.tiene_intento ? `${a.respondidas}/${a.total ?? totalPreg}` : "—"}</td>
-      <td class="num">${notaTxt}</td>
-      <td>${a.entregado ? esc(hora(a.entregado)) : ""}</td>
-      <td><div class="row">
+      <td class="num c-nro">${a.nro ?? ""}</td>
+      <td class="c-nombre">${a.nro ? `<span class="solo-movil">${a.nro}. </span>` : ""}${esc(a.apellido)}, ${esc(a.nombre)}</td>
+      <td data-label="DNI">${esc(a.dni)}</td>
+      <td data-label="Estado">${badge}</td>
+      <td class="num" data-label="Respondidas">${a.tiene_intento ? `${a.respondidas}/${a.total ?? totalPreg}` : "—"}</td>
+      <td class="num" data-label="Nota">${notaTxt}</td>
+      <td data-label="Entrega">${a.entregado ? esc(hora(a.entregado)) : "—"}</td>
+      <td class="c-acc"><div class="row">
         <button class="secondary small" data-acc="ver" data-dni="${esc(a.dni)}">Ver</button>
         ${a.tiene_intento ? `<button class="secondary small" data-acc="reabrir" data-dni="${esc(a.dni)}">Nuevo intento</button>` : ""}
         <button class="danger secondary small" data-acc="eliminar" data-dni="${esc(a.dni)}">Eliminar</button>
@@ -502,8 +547,8 @@ async function verAlumno(dni) {
   abrirModal(html);
 }
 
-function abrirModal(html) { $("#modal-cont").innerHTML = html; $("#modal").classList.remove("hidden"); }
-function cerrarModal() { $("#modal").classList.add("hidden"); }
+function abrirModal(html) { $("#modal-cont").innerHTML = html; $("#modal").classList.remove("hidden"); document.body.style.overflow = "hidden"; }
+function cerrarModal() { $("#modal").classList.add("hidden"); document.body.style.overflow = ""; }
 $("#modal").addEventListener("click", e => { if (e.target.id === "modal") cerrarModal(); });
 document.addEventListener("keydown", e => { if (e.key === "Escape") cerrarModal(); });
 
@@ -705,9 +750,9 @@ function renderPreguntas() {
   $("#preg-titulo").textContent = `Preguntas (${datos.preguntas.length})`;
   $("#lista-preguntas").innerHTML = datos.preguntas.map((p, n) => `
     <div class="preg">
-      <div class="row" style="justify-content:space-between; align-items:flex-start; flex-wrap:nowrap">
+      <div class="preg-cab">
         <strong>${n + 1}. ${esc(p.enunciado)}</strong>
-        <div class="row" style="flex-wrap:nowrap">
+        <div class="row">
           <button class="secondary small" data-ed="${p.id}" ${bloqueado ? "disabled" : ""}>Editar</button>
           <button class="danger secondary small" data-del="${p.id}" ${bloqueado ? "disabled" : ""}>Eliminar</button>
         </div>

@@ -33,6 +33,21 @@
   .det .exp { color: var(--muted); font-size: .93rem; }
   .bloqueo { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 40; display: flex; align-items: center; justify-content: center; padding: 16px; }
   .bloqueo .card { max-width: 420px; text-align: center; margin: 0; }
+
+  /* ---------- Celular ---------- */
+  @media (max-width: 600px) {
+    .wrap { padding-top: 16px; }
+    .barra { flex-wrap: nowrap; padding: 8px 0; }
+    .barra > div:last-child { min-width: 0; }
+    .reloj { font-size: 1.35rem; }
+    .guardado { font-size: .78rem; }
+    #p-examen .card { padding: 14px; }
+    .opt span { padding: 12px 14px; }
+    #btn-entregar, #btn-ingresar, #btn-confirmar, #btn-no-soy { width: 100%; padding: 14px; font-size: 1.05rem; }
+    #dni { max-width: none !important; }
+    .nota-box { gap: 14px; }
+    .nota { font-size: 2.6rem; min-width: 96px; }
+  }
 </style>
 </head>
 <body>
@@ -199,7 +214,7 @@ function cargarLocal() {
 }
 function guardarLocal() { if (sesion) escribirLS(lsResp(sesion.dni), { respuestas, sucio }); }
 function fechaHora(iso) {
-  return new Date(iso).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 }
 
 /* ---------- ingreso ---------- */
@@ -390,7 +405,7 @@ function estadoGuardado(tipo) {
   g.className = "guardado " + tipo;
   g.textContent = {
     guardando: "Guardando…",
-    ok: "✔ Respuestas guardadas " + new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    ok: "✔ Respuestas guardadas " + new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }),
     offline: "Sin conexión: guardado en el teléfono, reintentando…",
   }[tipo];
 }
