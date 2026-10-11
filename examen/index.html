@@ -51,23 +51,23 @@
   <!-- INGRESO -->
   <section class="card pantalla hidden" id="p-ingreso">
     <h2>Ingreso al examen</h2>
-    <p class="muted">Ingresá tus datos. Si ya te registraste, usá el mismo DNI y apellido para continuar donde estabas.</p>
-    <form id="form-ingreso" autocomplete="on" novalidate>
+    <form id="form-ingreso" autocomplete="off" novalidate>
+      <p class="muted">Escribí tu número de DNI, sin puntos.</p>
       <div class="field">
-        <label for="dni">DNI (sin puntos)</label>
-        <input type="text" id="dni" inputmode="numeric" pattern="[0-9]*" maxlength="10" required>
-      </div>
-      <div class="field">
-        <label for="apellido">Apellido</label>
-        <input type="text" id="apellido" autocomplete="family-name" required>
-      </div>
-      <div class="field">
-        <label for="nombre">Nombre</label>
-        <input type="text" id="nombre" autocomplete="given-name" required>
+        <label for="dni">DNI</label>
+        <input type="text" id="dni" inputmode="numeric" pattern="[0-9]*" maxlength="10" required style="font-size:1.3rem; max-width:260px">
       </div>
       <div id="ingreso-error" class="msg error hidden"></div>
-      <div class="row" style="margin-top:18px"><button type="submit" id="btn-ingresar">Ingresar</button></div>
+      <div class="row" style="margin-top:18px"><button type="submit" id="btn-ingresar">Continuar</button></div>
     </form>
+    <div id="confirmar" class="hidden">
+      <p style="font-size:1.1rem">¿Sos <strong id="confirmar-nombre"></strong>?</p>
+      <p class="muted" id="confirmar-dni"></p>
+      <div class="row">
+        <button type="button" id="btn-confirmar">Sí, ingresar</button>
+        <button type="button" class="secondary" id="btn-no-soy">No, volver</button>
+      </div>
+    </div>
   </section>
 
   <!-- CARGANDO -->
@@ -78,7 +78,7 @@
 
   <!-- ESPERA -->
   <section class="card pantalla hidden" id="p-espera">
-    <h2>Ya estás registrado/a ✔</h2>
+    <h2>Ingresaste correctamente ✔</h2>
     <p>El examen todavía no comenzó. <strong>No cierres esta página</strong>: va a empezar sola cuando la docente lo habilite.</p>
     <div class="spinner"></div>
     <p class="muted" style="text-align:center">Esperando a que la docente habilite el examen…</p>
@@ -209,27 +209,44 @@ $("#form-ingreso").addEventListener("submit", async e => {
   e.preventDefault();
   const err = $("#ingreso-error");
   err.classList.add("hidden");
-  const dni = $("#dni").value.trim(), apellido = $("#apellido").value.trim(), nombre = $("#nombre").value.trim();
-  if (dni.length < 7 || !apellido || !nombre) {
-    err.textContent = "Completá DNI (7 u 8 números), apellido y nombre.";
+  const dni = $("#dni").value.trim();
+  if (dni.length < 7) {
+    err.textContent = "Escribí tu DNI completo (7 u 8 números).";
     err.classList.remove("hidden");
     return;
   }
   const btn = $("#btn-ingresar");
-  btn.disabled = true; btn.textContent = "Ingresando…";
+  btn.disabled = true; btn.textContent = "Buscando…";
   try {
-    const d = await rpc("alumno_ingresar", {
-      p_dni: dni, p_apellido: apellido, p_nombre: nombre, p_dispositivo: navigator.userAgent.slice(0, 200),
-    });
-    sesion = { token: d.token, dni: d.dni, apellido: d.apellido, nombre: d.nombre };
-    escribirLS(LS_SESION, sesion);
-    iniciarSesion();
+    const d = await rpc("alumno_ingresar", { p_dni: dni, p_dispositivo: navigator.userAgent.slice(0, 200) });
+    candidato = { token: d.token, dni: d.dni, apellido: d.apellido, nombre: d.nombre };
+    $("#confirmar-nombre").textContent = `${d.nombre} ${d.apellido}`;
+    $("#confirmar-dni").textContent = `DNI ${d.dni}`;
+    $("#form-ingreso").classList.add("hidden");
+    $("#confirmar").classList.remove("hidden");
   } catch (ex) {
     err.textContent = ex.code === "P0001" ? ex.message : "No se pudo conectar. Revisá tu conexión e intentá de nuevo.";
     err.classList.remove("hidden");
   } finally {
-    btn.disabled = false; btn.textContent = "Ingresar";
+    btn.disabled = false; btn.textContent = "Continuar";
   }
+});
+
+let candidato = null;
+function volverAlDni() {
+  candidato = null;
+  $("#confirmar").classList.add("hidden");
+  $("#form-ingreso").classList.remove("hidden");
+  $("#dni").value = "";
+  $("#dni").focus();
+}
+$("#btn-no-soy").addEventListener("click", volverAlDni);
+$("#btn-confirmar").addEventListener("click", () => {
+  if (!candidato) return;
+  sesion = candidato;
+  escribirLS(LS_SESION, sesion);
+  volverAlDni();
+  iniciarSesion();
 });
 
 function iniciarSesion() {
@@ -243,7 +260,7 @@ function iniciarSesion() {
 
 function salir(forzado) {
   if (!forzado && estado && estado.en_examen &&
-      !confirm("Tu avance queda guardado. Podés volver a entrar con tu DNI y apellido.\n\n¿Querés salir?")) return;
+      !confirm("Tu avance queda guardado. Podés volver a entrar con tu DNI.\n\n¿Querés salir?")) return;
   [tRefresco, tGuardar].forEach(clearTimeout);
   clearInterval(tReloj); tReloj = null;
   borrarLS(LS_SESION);

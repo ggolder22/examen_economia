@@ -127,7 +127,7 @@
           <input type="text" id="link-alumnos" readonly style="max-width:420px">
           <button type="button" class="secondary" id="btn-copiar">Copiar</button>
         </div>
-        <p class="muted" style="margin-bottom:0">Los alumnos pueden entrar y registrarse antes de que habilites el examen: quedan en espera y comienza solo.</p>
+        <p class="muted" style="margin-bottom:0">Los alumnos entran solo con su DNI (deben estar en la lista). Pueden entrar antes de que habilites el examen: quedan en espera y comienza solo.</p>
       </div>
     </section>
 
@@ -136,18 +136,23 @@
       <div class="card">
         <div class="row" style="justify-content:space-between">
           <input type="text" id="buscar" placeholder="Buscar por apellido, nombre o DNI" style="max-width:340px">
-          <button type="button" class="secondary" id="btn-csv">Descargar planilla (CSV)</button>
+          <div class="row">
+            <button type="button" id="btn-excel">Descargar notas (Excel)</button>
+            <button type="button" class="secondary" id="btn-importar">Importar lista desde Excel</button>
+            <button type="button" class="secondary" id="btn-agregar">+ Agregar alumno</button>
+          </div>
         </div>
+        <input type="file" id="archivo-excel" accept=".xlsx" class="hidden">
         <div class="tabla-wrap">
           <table class="tabla">
             <thead><tr>
-              <th>Apellido y nombre</th><th>DNI</th><th>Estado</th>
+              <th class="num">Nº</th><th>Apellido y nombre</th><th>DNI</th><th>Estado</th>
               <th class="num">Resp.</th><th class="num">Nota</th><th>Entrega</th><th></th>
             </tr></thead>
             <tbody id="tbody-alumnos"></tbody>
           </table>
         </div>
-        <p class="muted hidden" id="sin-alumnos">Todavía no hay alumnos registrados.</p>
+        <p class="muted hidden" id="sin-alumnos">Todavía no hay alumnos cargados. Usá “Importar lista desde Excel” o “Agregar alumno”.</p>
       </div>
     </section>
 
@@ -178,10 +183,9 @@
       </div>
       <div class="card peligro">
         <h2>Zona de riesgo</h2>
-        <p class="muted">Usalo después de hacer una prueba, antes del examen real. El registro de actividad no se borra.</p>
+        <p class="muted">Usalo después de hacer una prueba, antes del examen real. La lista de alumnos y el registro de actividad no se borran.</p>
         <div class="row">
-          <button type="button" class="danger secondary" id="btn-reset-intentos">Borrar todos los exámenes rendidos</button>
-          <button type="button" class="danger" id="btn-reset-todo">Borrar alumnos y exámenes</button>
+          <button type="button" class="danger" id="btn-reset-intentos">Borrar todos los exámenes rendidos</button>
         </div>
       </div>
     </section>
@@ -191,6 +195,7 @@
 <div id="modal" class="modal-fondo hidden"><div class="modal" id="modal-cont"></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="/assets/config.js"></script>
 <script>
 const CFG = window.EXAMEN_CONFIG;
@@ -313,7 +318,8 @@ $("#tabs").addEventListener("click", e => {
 function estadoAlumno(a) {
   if (a.entregado) return "entregado";
   if (a.tiene_intento) return "rindiendo";
-  return "esperando";
+  if (datos && datos.estado === "finalizado") return "ausente";
+  return a.ultimo_acceso ? "esperando" : "sin_ingresar";
 }
 
 function renderControl() {
@@ -323,7 +329,7 @@ function renderControl() {
   badge.className = "badge " + { no_iniciado: "gris", en_curso: "ok", finalizado: "bad" }[est];
 
   $("#estado-txt").textContent = {
-    no_iniciado: "Los alumnos pueden registrarse y quedan en espera hasta que habilites el examen.",
+    no_iniciado: "Los alumnos pueden ingresar con su DNI y quedan en espera hasta que habilites el examen.",
     en_curso: `Comenzó a las ${hora(c.inicio)} y termina a las ${hora(c.fin)}. Los alumnos que entran tarde tienen el tiempo que queda.`,
     finalizado: `Finalizó a las ${hora(c.fin)}. Los exámenes sin entregar se cierran y corrigen automáticamente.`,
   }[est];
@@ -403,9 +409,12 @@ function renderAlumnos() {
     else if (est === "rindiendo") {
       const inactivo = a.ultimo_acceso && ahora() - Date.parse(a.ultimo_acceso) > 90000;
       badge = `<span class="badge warn">Rindiendo</span>` + (inactivo ? `<br><small class="muted">sin señal ${esc(hace(a.ultimo_acceso))}</small>` : "");
-    } else badge = `<span class="badge gris">Esperando</span>`;
+    } else if (est === "esperando") badge = `<span class="badge">Esperando</span>`;
+    else if (est === "ausente") badge = `<span class="badge bad">Ausente</span>`;
+    else badge = `<span class="badge gris">No ingresó</span>`;
     const notaTxt = a.entregado ? `<strong style="color:var(--${Number(a.nota) >= aprob ? "ok" : "bad"})">${nota(a.nota)}</strong>` : "—";
     return `<tr>
+      <td class="num">${a.nro ?? ""}</td>
       <td>${esc(a.apellido)}, ${esc(a.nombre)}</td>
       <td>${esc(a.dni)}</td>
       <td>${badge}</td>
@@ -466,7 +475,7 @@ async function verAlumno(dni) {
   let html = `<div class="row" style="justify-content:space-between">
       <h2 style="margin:0">${esc(a.apellido)}, ${esc(a.nombre)}</h2>
       <button class="secondary small" onclick="cerrarModal()">Cerrar</button></div>
-    <p class="muted">DNI ${esc(a.dni)} · registrado ${esc(fechaHora(a.creado))}</p>`;
+    <p class="muted">${a.nro ? "Nº " + esc(a.nro) + " · " : ""}DNI ${esc(a.dni)}${a.ultimo_acceso ? " · último ingreso " + esc(fechaHora(a.ultimo_acceso)) : " · todavía no ingresó"}</p>`;
 
   if (!i) html += `<p>No comenzó el examen.</p>`;
   else if (i.detalle) {
@@ -495,22 +504,143 @@ function cerrarModal() { $("#modal").classList.add("hidden"); }
 $("#modal").addEventListener("click", e => { if (e.target.id === "modal") cerrarModal(); });
 document.addEventListener("keydown", e => { if (e.key === "Escape") cerrarModal(); });
 
-$("#btn-csv").addEventListener("click", () => {
-  const aprob = Number(datos.config.nota_aprobacion);
-  const filas = [["Apellido", "Nombre", "DNI", "Estado", "Respondidas", "Correctas", "Total", "Nota", "Condición", "Entregado", "Entrega automática"]];
-  datos.alumnos.forEach(a => filas.push([
-    a.apellido, a.nombre, a.dni, estadoAlumno(a),
-    a.tiene_intento ? a.respondidas : "", a.aciertos ?? "", a.total ?? "",
-    a.nota != null ? String(a.nota).replace(".", ",") : "",
-    a.entregado ? (Number(a.nota) >= aprob ? "Aprobado" : "Desaprobado") : "",
-    a.entregado ? fechaHora(a.entregado) : "", a.entregado ? (a.entrega_auto ? "Sí" : "No") : "",
-  ]));
-  const csv = "﻿" + filas.map(f => f.map(v => `"${String(v).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+const nombreCompleto = a => a.nombre ? `${a.apellido}, ${a.nombre}` : a.apellido;
+
+function descargarArchivo(nombreArchivo, buffer) {
   const link = document.createElement("a");
-  link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  link.download = `notas_examen_${new Date().toISOString().slice(0, 10)}.csv`;
+  link.href = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  link.download = nombreArchivo;
   link.click();
-  URL.revokeObjectURL(link.href);
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+// Planilla con el mismo formato que la lista del curso: Nº | Apellido y Nombre | DNI (+ Nota y Condición)
+$("#btn-excel").addEventListener("click", async () => {
+  const aprob = Number(datos.config.nota_aprobacion);
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Notas");
+  ws.columns = [
+    { header: "Nº", key: "nro", width: 6 },
+    { header: "Apellido y Nombre", key: "nombre", width: 38 },
+    { header: "DNI", key: "dni", width: 16 },
+    { header: "Nota", key: "nota", width: 10 },
+    { header: "Condición", key: "cond", width: 16 },
+  ];
+  datos.alumnos.forEach((a, i) => {
+    const entregado = !!a.entregado;
+    ws.addRow({
+      nro: a.nro ?? i + 1,
+      nombre: nombreCompleto(a),
+      dni: Number(a.dni) || a.dni,
+      nota: entregado ? Number(a.nota) : "Ausente",
+      cond: entregado ? (Number(a.nota) >= aprob ? "Aprobado" : "Desaprobado") : (a.tiene_intento ? "En curso" : "Ausente"),
+    });
+  });
+  const borde = { style: "thin", color: { argb: "FF000000" } };
+  ws.eachRow((row, n) => {
+    row.height = 18;
+    row.eachCell(cell => {
+      cell.border = { top: borde, left: borde, bottom: borde, right: borde };
+      if (n === 1) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2E75B6" } };
+        cell.font = { name: "Arial", size: 12, bold: true, color: { argb: "FFFFFFFF" } };
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+      } else {
+        cell.font = { name: "Arial", size: 11 };
+        cell.alignment = { vertical: "middle", horizontal: cell.col === 2 ? "left" : "center" };
+        if (cell.col === 4 && typeof cell.value === "number") cell.numFmt = "0.0";
+      }
+    });
+  });
+  const buf = await wb.xlsx.writeBuffer();
+  descargarArchivo(`notas_examen_${new Date().toISOString().slice(0, 10)}.xlsx`, buf);
+});
+
+// Separa "Apellido, Nombre"; si no hay coma, la primera palabra es el apellido
+function separarNombre(txt) {
+  const t = String(txt || "").replace(/\s+/g, " ").trim();
+  const c = t.indexOf(",");
+  if (c !== -1) return { apellido: t.slice(0, c).trim(), nombre: t.slice(c + 1).trim() };
+  const sp = t.indexOf(" ");
+  return sp === -1 ? { apellido: t, nombre: "" } : { apellido: t.slice(0, sp), nombre: t.slice(sp + 1) };
+}
+
+function textoCelda(v) {
+  if (v == null) return "";
+  if (typeof v === "object") return v.richText ? v.richText.map(r => r.text).join("") : String(v.text ?? v.result ?? "");
+  return String(v);
+}
+
+// Lee la primera hoja: busca la fila de encabezados (Nº, Apellido y Nombre, DNI) y toma las filas siguientes
+function leerLista(ws) {
+  let cab = false, cNro = null, cNom = null, cDni = null;
+  const lista = [];
+  ws.eachRow(row => {
+    const vals = (row.values || []).map(textoCelda);
+    if (!cab) {
+      vals.forEach((v, i) => {
+        const t = v.toLowerCase().trim();
+        if (t.includes("dni")) cDni = i;
+        else if (t.includes("apellido") || t.includes("nombre")) cNom = i;
+        else if (/^n[º°o.]*$/.test(t) || t === "nro" || t === "número") cNro = i;
+      });
+      cab = cDni != null && cNom != null;
+      return;
+    }
+    const dni = (vals[cDni] || "").replace(/\D/g, "");
+    if (dni.length < 6) return;
+    lista.push({ nro: cNro != null ? parseInt(vals[cNro], 10) || null : null, dni, ...separarNombre(vals[cNom]) });
+  });
+  if (!cab) throw new Error("No encontré las columnas “Apellido y Nombre” y “DNI” en la primera hoja.");
+  return lista;
+}
+
+$("#btn-importar").addEventListener("click", () => $("#archivo-excel").click());
+$("#archivo-excel").addEventListener("change", async e => {
+  const f = e.target.files[0];
+  e.target.value = "";
+  if (!f) return;
+  let lista;
+  try {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await f.arrayBuffer());
+    lista = leerLista(wb.worksheets[0]);
+  } catch (ex) {
+    return alert("No se pudo leer el archivo: " + ex.message);
+  }
+  if (!lista.length) return alert("No encontré alumnos en el archivo.");
+  const muestra = lista.slice(0, 5).map(a => `${a.nro ?? "-"}. ${a.apellido}, ${a.nombre} – ${a.dni}`).join("\n");
+  if (!confirm(`Se encontraron ${lista.length} alumnos. Por ejemplo:\n\n${muestra}\n\nLos que ya existen (mismo DNI) se actualizan. ¿Importar?`)) return;
+  const r = await accion("admin_importar_alumnos", { p_lista: lista });
+  if (r) toast(`Importación lista: ${r.nuevos} nuevos, ${r.actualizados} actualizados`);
+});
+
+$("#btn-agregar").addEventListener("click", () => {
+  const sig = Math.max(0, ...datos.alumnos.map(a => a.nro || 0)) + 1;
+  abrirModal(`
+    <h2>Agregar alumno</h2>
+    <form id="form-alumno">
+      <div class="field" style="max-width:120px"><label for="n-nro">Nº</label><input type="number" id="n-nro" value="${sig}"></div>
+      <div class="field"><label for="n-apellido">Apellido</label><input type="text" id="n-apellido" required></div>
+      <div class="field"><label for="n-nombre">Nombre</label><input type="text" id="n-nombre" required></div>
+      <div class="field" style="max-width:220px"><label for="n-dni">DNI (sin puntos)</label><input type="text" id="n-dni" inputmode="numeric" required></div>
+      <div class="row" style="margin-top:16px">
+        <button type="submit">Guardar</button>
+        <button type="button" class="secondary" onclick="cerrarModal()">Cancelar</button>
+      </div>
+    </form>`);
+  $("#form-alumno").addEventListener("submit", async ev => {
+    ev.preventDefault();
+    const a = {
+      nro: parseInt($("#n-nro").value, 10) || null,
+      apellido: $("#n-apellido").value.trim(),
+      nombre: $("#n-nombre").value.trim(),
+      dni: $("#n-dni").value.replace(/\D/g, ""),
+    };
+    if (!a.apellido || !a.nombre || a.dni.length < 7) return alert("Completá apellido, nombre y DNI.");
+    const r = await accion("admin_importar_alumnos", { p_lista: [a] });
+    if (r) { cerrarModal(); toast(r.nuevos ? "Alumno agregado" : "Ese DNI ya existía: se actualizaron sus datos"); }
+  });
 });
 
 /* ---------- preguntas ---------- */
@@ -649,13 +779,10 @@ function confirmarBorrado(txt) {
   return prompt(txt + "\n\nEscribí BORRAR para confirmar:") === "BORRAR";
 }
 $("#btn-reset-intentos").addEventListener("click", () => {
-  if (confirmarBorrado("Se borran TODOS los exámenes rendidos y el examen vuelve a 'no iniciado'. Los alumnos registrados se mantienen."))
+  if (confirmarBorrado("Se borran TODOS los exámenes rendidos y el examen vuelve a 'no iniciado'. La lista de alumnos se mantiene."))
     accion("admin_reiniciar", { p_borrar_alumnos: false }, "Exámenes borrados");
 });
-$("#btn-reset-todo").addEventListener("click", () => {
-  if (confirmarBorrado("Se borran TODOS los alumnos y sus exámenes, y el examen vuelve a 'no iniciado'."))
-    accion("admin_reiniciar", { p_borrar_alumnos: true }, "Alumnos y exámenes borrados");
-});
+
 
 /* ---------- inicio ---------- */
 if (CFG.SUPABASE_URL.includes("TU-PROYECTO")) {

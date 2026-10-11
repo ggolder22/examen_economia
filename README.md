@@ -7,8 +7,9 @@
 | Panel docente | `/admin/` | Docente |
 
 ## Cómo funciona el examen real
-- El alumno ingresa con **DNI, apellido y nombre**. Queda registrado y, en ese dispositivo, la próxima vez entra solo.
-  Si cambia de teléfono, vuelve a escribir los mismos datos y sigue donde estaba.
+- Los alumnos están **precargados** (lista del curso). El alumno ingresa **solo con su DNI**, confirma su nombre y entra.
+  Si el DNI no está en la lista, no puede ingresar. En ese dispositivo, la próxima vez entra solo; si cambia de
+  teléfono, vuelve a escribir su DNI y sigue donde estaba.
 - Mientras la docente no habilite el examen, el alumno queda **en espera**; cuando lo habilita, empieza solo.
 - Cada respuesta se guarda **al instante** en Supabase y también en el teléfono. Si se corta internet, se tilda o se cierra
   la página, no se pierde nada: al volver a entrar continúa con el tiempo que le queda.
@@ -20,7 +21,8 @@
 ## Panel docente (`/admin/`)
 - **Examen**: definir el tiempo disponible y el botón **Habilitar inicio del examen**; agregar minutos; finalizar.
 - **Alumnos y notas**: estado en vivo de cada alumno, nota, detalle de respuestas, registro de actividad,
-  permitir un nuevo intento, eliminar, descargar planilla CSV (abre en Excel).
+  permitir un nuevo intento, eliminar, agregar un alumno, **importar la lista desde Excel** (columnas Nº,
+  Apellido y Nombre, DNI) y **descargar las notas en Excel** con el formato de la escuela.
 - **Preguntas**: ver, editar, agregar y eliminar preguntas (no se puede durante el examen).
 - **Configuración**: título, nota de aprobación, mostrar o no la nota al alumno al entregar, y botones para
   borrar todo después de una prueba.
@@ -30,6 +32,7 @@
 ### 1. Supabase
 1. Crear un proyecto en [supabase.com](https://supabase.com) (el plan gratuito alcanza para 50 alumnos simultáneos).
 2. **SQL Editor → New query**: pegar todo `supabase/schema.sql` y presionar **Run**. Crea las tablas, funciones y las 10 preguntas.
+   Luego, en otra consulta, ejecutar `supabase/02_lista_alumnos.sql` (ingreso solo con DNI + lista de los 32 alumnos).
 3. **Authentication → Users → Add user → Create new user**: email y contraseña de la docente (marcar *Auto Confirm User*).
 4. En el SQL Editor, habilitarla como docente:
    ```sql
@@ -43,7 +46,7 @@
 Subir los cambios a GitHub; Vercel publica solo. No requiere configuración.
 
 ## Antes del examen
-- Hacer una **prueba completa** (habilitar con 2–3 minutos, entrar con un DNI de prueba, entregar) y luego en
-  **Configuración → Borrar alumnos y exámenes**.
+- Hacer una **prueba completa** (agregar un alumno de prueba, habilitar con 2–3 minutos, entrar con ese DNI,
+  entregar), luego eliminar ese alumno y usar **Configuración → Borrar todos los exámenes rendidos**.
 - Supabase gratuito **pausa el proyecto tras 7 días sin uso**: entrar al panel el día anterior para mantenerlo activo.
 - Los alumnos pueden registrarse antes de que empiece; conviene pedirles que entren unos minutos antes.
