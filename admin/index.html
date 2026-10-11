@@ -514,46 +514,97 @@ function descargarArchivo(nombreArchivo, buffer) {
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }
 
-// Planilla con el mismo formato que la lista del curso: Nº | Apellido y Nombre | DNI (+ Nota y Condición)
-$("#btn-excel").addEventListener("click", async () => {
+// Planilla de calificaciones con el formato de la escuela. La nota del examen va en la columna "Parcial".
+const MATERIA = "AMBIENTE EMPRESARIAL";
+
+function armarPlanilla(wb) {
   const aprob = Number(datos.config.nota_aprobacion);
-  const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Notas");
-  ws.columns = [
-    { header: "Nº", key: "nro", width: 6 },
-    { header: "Apellido y Nombre", key: "nombre", width: 38 },
-    { header: "DNI", key: "dni", width: 16 },
-    { header: "Nota", key: "nota", width: 10 },
-    { header: "Condición", key: "cond", width: 16 },
-  ];
-  datos.alumnos.forEach((a, i) => {
-    const entregado = !!a.entregado;
-    ws.addRow({
-      nro: a.nro ?? i + 1,
-      nombre: nombreCompleto(a),
-      dni: Number(a.dni) || a.dni,
-      nota: entregado ? Number(a.nota) : "Ausente",
-      cond: entregado ? (Number(a.nota) >= aprob ? "Aprobado" : "Desaprobado") : (a.tiene_intento ? "En curso" : "Ausente"),
-    });
-  });
   const borde = { style: "thin", color: { argb: "FF000000" } };
-  ws.eachRow((row, n) => {
-    row.height = 18;
-    row.eachCell(cell => {
-      cell.border = { top: borde, left: borde, bottom: borde, right: borde };
-      if (n === 1) {
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2E75B6" } };
-        cell.font = { name: "Arial", size: 12, bold: true, color: { argb: "FFFFFFFF" } };
-        cell.alignment = { vertical: "middle", horizontal: "center" };
-      } else {
-        cell.font = { name: "Arial", size: 11 };
-        cell.alignment = { vertical: "middle", horizontal: cell.col === 2 ? "left" : "center" };
-        if (cell.col === 4 && typeof cell.value === "number") cell.numFmt = "0.0";
-      }
-    });
+  const bordes = { top: borde, left: borde, bottom: borde, right: borde };
+  const fuente = { name: "Calibri", size: 11 };
+  const negrita = { name: "Calibri", size: 11, bold: true };
+
+  /* --- Hoja 1: formato de la escuela --- */
+  const ws = wb.addWorksheet("Calificaciones", { views: [{ state: "frozen", ySplit: 4 }] });
+  const anchos = [5, 36, 12, 6, 6, 6, 11, 13, 12, 10, 12, 15, 13, 15, 20];
+  anchos.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+  ws.getCell("B1").value = MATERIA;
+  ws.getCell("B1").font = { name: "Calibri", size: 14, bold: true };
+  ws.getRow(1).height = 22;
+
+  // Encabezado en dos filas (3 y 4)
+  const cab = [
+    ["A", "Nº"], ["B", "NOMBRE Y APELLIDO"], ["C", "DNI"], ["G", "Parcial"], ["H", "Recuperatorio"],
+    ["I", "Trabajo integrador"], ["J", "FINAL"], ["K", "ASISTENCIA A CLASE"], ["L", "PARTICIPACIÓN EN CLASE"],
+    ["M", "EVALUACIÓN TIPO"], ["N", "CALIFICACIÓN FINAL"], ["O", "OBSERVACIÓN"],
+  ];
+  cab.forEach(([col, txt]) => {
+    ws.mergeCells(`${col}3:${col}4`);
+    ws.getCell(`${col}3`).value = txt;
   });
+  ws.mergeCells("D3:F3");
+  ws.getCell("D3").value = "Prácticos";
+  ["D", "E", "F"].forEach((col, i) => { ws.getCell(`${col}4`).value = i + 1; });
+  [3, 4].forEach(r => {
+    ws.getRow(r).height = 20;
+    for (let c = 1; c <= 15; c++) {
+      const cell = ws.getRow(r).getCell(c);
+      cell.font = negrita;
+      cell.border = bordes;
+      cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    }
+  });
+  ws.getCell("H3").font = { name: "Calibri", size: 9, bold: true };
+
+  // Alumnos: la nota del examen va en "Parcial" (columna G)
+  datos.alumnos.forEach((a, i) => {
+    const row = ws.getRow(5 + i);
+    row.getCell(1).value = a.nro ?? i + 1;
+    row.getCell(2).value = nombreCompleto(a);
+    row.getCell(3).value = Number(a.dni) || a.dni;
+    row.getCell(7).value = a.entregado ? Number(a.nota) : (a.tiene_intento ? "En curso" : "Ausente");
+    row.height = 18;
+    for (let c = 1; c <= 15; c++) {
+      const cell = row.getCell(c);
+      cell.font = fuente;
+      cell.border = bordes;
+      cell.alignment = { vertical: "middle", horizontal: c === 2 ? "left" : c === 3 ? "right" : "center" };
+    }
+  });
+
+  /* --- Hoja 2: detalle del examen --- */
+  const wd = wb.addWorksheet("Detalle del examen");
+  wd.columns = [
+    { header: "Nº", key: "nro", width: 5 },
+    { header: "NOMBRE Y APELLIDO", key: "nombre", width: 36 },
+    { header: "DNI", key: "dni", width: 12 },
+    { header: "Correctas", key: "ok", width: 11 },
+    { header: "Nota", key: "nota", width: 8 },
+    { header: "Condición", key: "cond", width: 14 },
+    { header: "Entrega", key: "ent", width: 20 },
+  ];
+  datos.alumnos.forEach((a, i) => wd.addRow({
+    nro: a.nro ?? i + 1,
+    nombre: nombreCompleto(a),
+    dni: Number(a.dni) || a.dni,
+    ok: a.entregado ? `${a.aciertos}/${a.total}` : "",
+    nota: a.entregado ? Number(a.nota) : "",
+    cond: a.entregado ? (Number(a.nota) >= aprob ? "Aprobado" : "Desaprobado") : (a.tiene_intento ? "En curso" : "Ausente"),
+    ent: a.entregado ? fechaHora(a.entregado) + (a.entrega_auto ? " (auto)" : "") : "",
+  }));
+  wd.eachRow((row, n) => row.eachCell(cell => {
+    cell.border = bordes;
+    cell.font = n === 1 ? negrita : fuente;
+    cell.alignment = { vertical: "middle", horizontal: cell.col === 2 ? "left" : "center" };
+  }));
+}
+
+$("#btn-excel").addEventListener("click", async () => {
+  const wb = new ExcelJS.Workbook();
+  armarPlanilla(wb);
   const buf = await wb.xlsx.writeBuffer();
-  descargarArchivo(`notas_examen_${new Date().toISOString().slice(0, 10)}.xlsx`, buf);
+  descargarArchivo(`${MATERIA.toLowerCase().replace(/\s+/g, "_")}_parcial_${new Date().toISOString().slice(0, 10)}.xlsx`, buf);
 });
 
 // Separa "Apellido, Nombre"; si no hay coma, la primera palabra es el apellido
