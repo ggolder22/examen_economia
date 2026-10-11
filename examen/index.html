@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Examen de Economía</title>
+<link rel="stylesheet" href="/assets/estilos.css">
+<style>
+  .barra {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    padding: 10px 0; margin-top: 12px;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .reloj { font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .reloj.warn { color: var(--warn); }
+  .reloj.bad { color: var(--bad); }
+  .guardado { font-size: .85rem; }
+  .guardado.ok { color: var(--ok); }
+  .guardado.offline { color: var(--bad); font-weight: 600; }
+  .quien { font-size: .9rem; color: var(--muted); margin-top: 4px; }
+  .nota-box { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .nota { font-size: 3rem; font-weight: 800; line-height: 1; min-width: 110px; text-align: center; padding: 16px 10px; border-radius: 12px; }
+  .nota.aprobado { color: var(--ok); background: var(--ok-soft); }
+  .nota.desaprobado { color: var(--bad); background: var(--bad-soft); }
+  .nota small { display: block; font-size: .8rem; font-weight: 600; margin-top: 6px; }
+  .det { border-top: 1px solid var(--border); padding: 14px 0; }
+  .det .marca { font-weight: 700; margin-right: 6px; }
+  .det.ok .marca { color: var(--ok); }
+  .det.bad .marca { color: var(--bad); }
+  .det p { margin: 4px 0; }
+  .det .exp { color: var(--muted); font-size: .93rem; }
+  .bloqueo { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 40; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .bloqueo .card { max-width: 420px; text-align: center; margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="titulo">Examen de Economía</h1>
+    <div class="quien hidden" id="quien">
+      <span id="quien-txt"></span> · <button class="link" id="btn-salir" type="button">No soy yo / Salir</button>
+    </div>
+  </header>
+
+  <div id="banner-conexion" class="msg warn hidden">
+    Sin conexión a internet. Tus respuestas quedan guardadas en este dispositivo y se envían solas cuando vuelva la conexión.
+  </div>
+
+  <!-- INGRESO -->
+  <section class="card pantalla hidden" id="p-ingreso">
+    <h2>Ingreso al examen</h2>
+    <p class="muted">Ingresá tus datos. Si ya te registraste, usá el mismo DNI y apellido para continuar donde estabas.</p>
+    <form id="form-ingreso" autocomplete="on" novalidate>
+      <div class="field">
+        <label for="dni">DNI (sin puntos)</label>
+        <input type="text" id="dni" inputmode="numeric" pattern="[0-9]*" maxlength="10" required>
+      </div>
+      <div class="field">
+        <label for="apellido">Apellido</label>
+        <input type="text" id="apellido" autocomplete="family-name" required>
+      </div>
+      <div class="field">
+        <label for="nombre">Nombre</label>
+        <input type="text" id="nombre" autocomplete="given-name" required>
+      </div>
+      <div id="ingreso-error" class="msg error hidden"></div>
+      <div class="row" style="margin-top:18px"><button type="submit" id="btn-ingresar">Ingresar</button></div>
+    </form>
+  </section>
+
+  <!-- CARGANDO -->
+  <section class="card pantalla" id="p-cargando">
+    <div class="spinner"></div>
+    <p class="muted" style="text-align:center" id="cargando-txt">Cargando…</p>
+  </section>
+
+  <!-- ESPERA -->
+  <section class="card pantalla hidden" id="p-espera">
+    <h2>Ya estás registrado/a ✔</h2>
+    <p>El examen todavía no comenzó. <strong>No cierres esta página</strong>: va a empezar sola cuando la docente lo habilite.</p>
+    <div class="spinner"></div>
+    <p class="muted" style="text-align:center">Esperando a que la docente habilite el examen…</p>
+  </section>
+
+  <!-- EXAMEN -->
+  <section class="pantalla hidden" id="p-examen">
+    <div class="barra">
+      <div>
+        <div class="muted" style="font-size:.8rem">Tiempo restante</div>
+        <div class="reloj" id="reloj">--:--</div>
+      </div>
+      <div style="text-align:right">
+        <div id="progreso" style="font-weight:600">0 / 10 respondidas</div>
+        <div class="guardado" id="guardado">Tus respuestas se guardan automáticamente</div>
+      </div>
+    </div>
+    <div class="msg warn" style="font-size:.92rem">
+      Elegí una opción en cada pregunta. Si se cierra la página o se apaga el teléfono, volvé a entrar: vas a seguir donde estabas. Al terminar el tiempo, el examen se entrega solo.
+    </div>
+    <div class="card" id="preguntas"></div>
+    <div class="row" style="margin-top:20px"><button type="button" id="btn-entregar">Entregar examen</button></div>
+  </section>
+
+  <!-- RESULTADO -->
+  <section class="pantalla hidden" id="p-resultado"></section>
+
+  <!-- FINALIZADO SIN RENDIR -->
+  <section class="card pantalla hidden" id="p-finalizado">
+    <h2>El examen finalizó</h2>
+    <p>El tiempo del examen terminó y no se registró ningún intento con tu DNI. Si creés que es un error, avisale a la docente.</p>
+  </section>
+</div>
+
+<div class="bloqueo hidden" id="bloqueo">
+  <div class="card">
+    <div class="spinner"></div>
+    <p id="bloqueo-txt" style="margin-bottom:0">Entregando examen…</p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/assets/config.js"></script>
+<script>
+const CFG = window.EXAMEN_CONFIG;
+const sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
+const LS_SESION = "examen_eco_sesion";
+const lsResp = dni => "examen_eco_resp_" + dni;
+
+const $ = s => document.querySelector(s);
+const leerLS = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+const escribirLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const borrarLS = k => { try { localStorage.removeItem(k); } catch {} };
+
+let sesion = leerLS(LS_SESION);   // { token, dni, apellido, nombre }
+let estado = null;                // última respuesta del servidor
+let offset = 0;                   // diferencia reloj servidor - reloj local (ms)
+let respuestas = {};              // { idPregunta: indiceOpcion }
+let sucio = false;                // hay respuestas sin confirmar por el servidor
+let clavePreguntas = null;
+let tRefresco = null, tGuardar = null, tReloj = null;
+let guardando = false, entregando = false;
+
+/* ---------- utilidades ---------- */
+function el(tag, attrs = {}, ...children) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v;
+    else if (k === "text") n.textContent = v;
+    else n.setAttribute(k, v);
+  }
+  for (const c of children) if (c != null) n.append(c);
+  return n;
+}
+
+async function rpc(fn, args) {
+  const { data, error } = await sb.rpc(fn, args);
+  if (error) {
+    const e = new Error(error.message || "Error de conexión");
+    e.code = error.code;          // "P0001" = mensaje del examen; otro = problema de red/servidor
+    throw e;
+  }
+  return data;
+}
+
+function mostrar(id) {
+  document.querySelectorAll(".pantalla").forEach(p => p.classList.toggle("hidden", p.id !== "p-" + id));
+}
+
+function igual(a, b) {
+  const ka = Object.keys(a), kb = Object.keys(b);
+  return ka.length === kb.length && ka.every(k => a[k] === b[k]);
+}
+
+// Mezcla con semilla (cada alumno ve siempre el mismo orden, distinto al de sus compañeros)
+function generador(texto) {
+  let h = 1779033703 ^ texto.length;
+  for (let i = 0; i < texto.length; i++) { h = Math.imul(h ^ texto.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+  return () => {
+    h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
+}
+function mezclar(arr, rnd) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+function conexion(ok) { $("#banner-conexion").classList.toggle("hidden", ok); }
+function cargarLocal() {
+  const l = leerLS(lsResp(sesion.dni));
+  respuestas = (l && l.respuestas) || {};
+  sucio = !!(l && l.sucio);
+}
+function guardarLocal() { if (sesion) escribirLS(lsResp(sesion.dni), { respuestas, sucio }); }
+function fechaHora(iso) {
+  return new Date(iso).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+/* ---------- ingreso ---------- */
+$("#dni").addEventListener("input", e => { e.target.value = e.target.value.replace(/\D/g, ""); });
+
+$("#form-ingreso").addEventListener("submit", async e => {
+  e.preventDefault();
+  const err = $("#ingreso-error");
+  err.classList.add("hidden");
+  const dni = $("#dni").value.trim(), apellido = $("#apellido").value.trim(), nombre = $("#nombre").value.trim();
+  if (dni.length < 7 || !apellido || !nombre) {
+    err.textContent = "Completá DNI (7 u 8 números), apellido y nombre.";
+    err.classList.remove("hidden");
+    return;
+  }
+  const btn = $("#btn-ingresar");
+  btn.disabled = true; btn.textContent = "Ingresando…";
+  try {
+    const d = await rpc("alumno_ingresar", {
+      p_dni: dni, p_apellido: apellido, p_nombre: nombre, p_dispositivo: navigator.userAgent.slice(0, 200),
+    });
+    sesion = { token: d.token, dni: d.dni, apellido: d.apellido, nombre: d.nombre };
+    escribirLS(LS_SESION, sesion);
+    iniciarSesion();
+  } catch (ex) {
+    err.textContent = ex.code === "P0001" ? ex.message : "No se pudo conectar. Revisá tu conexión e intentá de nuevo.";
+    err.classList.remove("hidden");
+  } finally {
+    btn.disabled = false; btn.textContent = "Ingresar";
+  }
+});
+
+function iniciarSesion() {
+  $("#quien-txt").textContent = `${sesion.apellido}, ${sesion.nombre} · DNI ${sesion.dni}`;
+  $("#quien").classList.remove("hidden");
+  $("#cargando-txt").textContent = "Cargando…";
+  mostrar("cargando");
+  cargarLocal();
+  refrescar();
+}
+
+function salir(forzado) {
+  if (!forzado && estado && estado.en_examen &&
+      !confirm("Tu avance queda guardado. Podés volver a entrar con tu DNI y apellido.\n\n¿Querés salir?")) return;
+  [tRefresco, tGuardar].forEach(clearTimeout);
+  clearInterval(tReloj); tReloj = null;
+  borrarLS(LS_SESION);
+  sesion = null; estado = null; clavePreguntas = null;
+  $("#quien").classList.add("hidden");
+  $("#form-ingreso").reset();
+  mostrar("ingreso");
+  if (forzado) {
+    $("#ingreso-error").textContent = "Tu sesión ya no es válida. Ingresá nuevamente.";
+    $("#ingreso-error").classList.remove("hidden");
+  }
+}
+$("#btn-salir").addEventListener("click", () => salir(false));
+
+/* ---------- sincronización con el servidor ---------- */
+let refrescando = false;
+async function refrescar() {
+  if (!sesion || entregando || refrescando) return;
+  clearTimeout(tRefresco);
+  refrescando = true;
+  const enviadas = sucio ? { ...respuestas } : null;
+  try {
+    const d = await rpc("alumno_estado", { p_token: sesion.token, p_respuestas: enviadas });
+    if (enviadas && igual(enviadas, respuestas)) { sucio = false; guardarLocal(); }
+    conexion(true);
+    aplicar(d);
+  } catch (ex) {
+    if (ex.message === "SESION_INVALIDA") return salir(true);
+    conexion(false);
+    if (!estado) $("#cargando-txt").textContent = "Sin conexión. Reintentando…";
+    tRefresco = setTimeout(refrescar, 4000);
+  } finally {
+    refrescando = false;
+  }
+}
+
+function aplicar(d) {
+  estado = d;
+  offset = Date.parse(d.ahora) - Date.now();
+  $("#titulo").textContent = d.titulo || "Examen de Economía";
+  document.title = d.titulo || "Examen de Economía";
+
+  if (d.resultado) return pantallaResultado(d.resultado);
+
+  if (d.en_examen && d.preguntas) {
+    respuestas = sucio ? { ...(d.respuestas || {}), ...respuestas } : { ...(d.respuestas || {}) };
+    guardarLocal();
+    pantallaExamen(d);
+    if (sucio) programarGuardado(0);
+    tRefresco = setTimeout(refrescar, 30000);
+    return;
+  }
+
+  clearInterval(tReloj); tReloj = null;
+  if (d.estado === "no_iniciado") {
+    mostrar("espera");
+    tRefresco = setTimeout(refrescar, 4000 + Math.random() * 2000);
+  } else {
+    mostrar("finalizado");
+    tRefresco = setTimeout(refrescar, 30000);
+  }
+}
+
+/* ---------- examen ---------- */
+function pantallaExamen(d) {
+  const clave = d.preguntas.map(p => p.id + ":" + p.opciones.length).join(",");
+  if (clave !== clavePreguntas) { renderPreguntas(d.preguntas); clavePreguntas = clave; }
+  marcarRespuestas();
+  actualizarProgreso();
+  mostrar("examen");
+  if (!tReloj) { tReloj = setInterval(tic, 1000); }
+  tic();
+}
+
+function renderPreguntas(preguntas) {
+  const cont = $("#preguntas");
+  cont.innerHTML = "";
+  const rnd = generador(sesion.dni);
+  mezclar(preguntas, rnd).forEach((p, i) => {
+    const div = el("div", { class: "item" });
+    div.append(el("p", { class: "q" }, el("span", { class: "n", text: `${i + 1}.` }), document.createTextNode(p.enunciado)));
+    const opts = el("div", { class: "opts", role: "radiogroup" });
+    mezclar(p.opciones.map((t, idx) => ({ t, idx })), rnd).forEach(o => {
+      const inp = el("input", { type: "radio", name: "p" + p.id, value: String(o.idx) });
+      inp.addEventListener("change", () => responder(p.id, o.idx));
+      opts.append(el("label", { class: "opt" }, inp, el("span", { text: o.t })));
+    });
+    div.append(opts);
+    cont.append(div);
+  });
+}
+
+function marcarRespuestas() {
+  document.querySelectorAll("#preguntas input[type=radio]").forEach(inp => {
+    const id = inp.name.slice(1);
+    inp.checked = respuestas[id] !== undefined && String(respuestas[id]) === inp.value;
+    inp.disabled = entregando;
+  });
+}
+
+function respondidas() {
+  if (!estado || !estado.preguntas) return 0;
+  return estado.preguntas.filter(p => respuestas[String(p.id)] !== undefined).length;
+}
+function actualizarProgreso() {
+  const total = estado && estado.preguntas ? estado.preguntas.length : 0;
+  $("#progreso").textContent = `${respondidas()} / ${total} respondidas`;
+}
+
+function responder(id, idx) {
+  if (entregando) return;
+  respuestas[String(id)] = idx;
+  sucio = true;
+  guardarLocal();
+  actualizarProgreso();
+  estadoGuardado("guardando");
+  programarGuardado(400);
+}
+
+function programarGuardado(ms) {
+  clearTimeout(tGuardar);
+  tGuardar = setTimeout(guardar, ms);
+}
+
+function estadoGuardado(tipo) {
+  const g = $("#guardado");
+  g.className = "guardado " + tipo;
+  g.textContent = {
+    guardando: "Guardando…",
+    ok: "✔ Respuestas guardadas " + new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    offline: "Sin conexión: guardado en el teléfono, reintentando…",
+  }[tipo];
+}
+
+async function guardar() {
+  if (!sucio || entregando || !sesion) return;
+  if (guardando) { programarGuardado(800); return; }
+  guardando = true;
+  const enviadas = { ...respuestas };
+  try {
+    const r = await rpc("alumno_guardar", { p_token: sesion.token, p_respuestas: enviadas });
+    if (igual(enviadas, respuestas)) { sucio = false; guardarLocal(); }
+    if (r && r.fin && estado) { estado.fin = r.fin; offset = Date.parse(r.ahora) - Date.now(); }
+    conexion(true);
+    estadoGuardado(sucio ? "guardando" : "ok");
+    if (sucio) programarGuardado(300);
+  } catch (ex) {
+    if (ex.message === "SESION_INVALIDA") { guardando = false; return salir(true); }
+    if (ex.message === "EXAMEN_CERRADO") { guardando = false; return refrescar(); }
+    conexion(false);
+    estadoGuardado("offline");
+    programarGuardado(3000);
+  } finally {
+    guardando = false;
+  }
+}
+
+function tic() {
+  if (!estado || !estado.fin) return;
+  const resta = Date.parse(estado.fin) - (Date.now() + offset);
+  const s = Math.max(0, Math.ceil(resta / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), seg = s % 60;
+  const r = $("#reloj");
+  r.textContent = (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(seg).padStart(2, "0");
+  r.className = "reloj" + (s <= 60 ? " bad" : s <= 300 ? " warn" : "");
+  if (resta <= 0 && !entregando) entregar(true);
+}
+
+$("#btn-entregar").addEventListener("click", () => entregar(false));
+
+function entregar(auto) {
+  if (entregando || !estado) return;
+  if (!auto) {
+    const faltan = (estado.preguntas || []).length - respondidas();
+    const aviso = faltan > 0 ? `Te faltan ${faltan} pregunta(s) sin responder.\n\n` : "";
+    if (!confirm(aviso + "¿Querés entregar el examen? Una vez entregado no lo vas a poder modificar.")) return;
+  }
+  entregando = true;
+  clearTimeout(tGuardar); clearTimeout(tRefresco);
+  clearInterval(tReloj); tReloj = null;
+  marcarRespuestas();
+  $("#bloqueo-txt").textContent = auto ? "Se terminó el tiempo. Entregando tu examen…" : "Entregando tu examen…";
+  $("#bloqueo").classList.remove("hidden");
+  intentarEntrega(auto);
+}
+
+async function intentarEntrega(auto) {
+  try {
+    const d = await rpc("alumno_entregar", { p_token: sesion.token, p_respuestas: respuestas, p_auto: auto });
+    sucio = false;
+    guardarLocal();
+    entregando = false;
+    $("#bloqueo").classList.add("hidden");
+    conexion(true);
+    aplicar(d);
+  } catch (ex) {
+    if (ex.message === "SESION_INVALIDA") { entregando = false; $("#bloqueo").classList.add("hidden"); return salir(true); }
+    conexion(false);
+    $("#bloqueo-txt").textContent = "No hay conexión. Reintentando la entrega… No cierres esta página: tus respuestas están guardadas en este teléfono.";
+    setTimeout(() => intentarEntrega(auto), 3000);
+  }
+}
+
+/* ---------- resultado ---------- */
+function pantallaResultado(res) {
+  clearInterval(tReloj); tReloj = null;
+  clearTimeout(tGuardar);
+  sucio = false;
+  borrarLS(lsResp(sesion.dni));
+  const cont = $("#p-resultado");
+  cont.innerHTML = "";
+
+  const cab = el("div", { class: "card" });
+  const entregaTxt = `Examen entregado el ${fechaHora(res.entregado)}` + (res.auto ? " (entrega automática al finalizar el tiempo)." : ".");
+  if (!res.visible) {
+    cab.append(el("h2", { text: "Examen entregado ✔" }),
+      el("p", { text: entregaTxt }),
+      el("p", { class: "muted", text: "Tus respuestas quedaron registradas. La docente te va a informar la nota." }));
+    cont.append(cab);
+    mostrar("resultado");
+    return;
+  }
+
+  const nota = Number(res.nota).toLocaleString("es-AR", { maximumFractionDigits: 1 });
+  cab.append(el("div", { class: "nota-box" },
+    el("div", { class: "nota " + (res.aprobado ? "aprobado" : "desaprobado") },
+      document.createTextNode(nota), el("small", { text: res.aprobado ? "APROBADO" : "DESAPROBADO" })),
+    el("div", {},
+      el("h2", { text: `${sesion.nombre} ${sesion.apellido}` }),
+      el("p", { style: "margin:0", text: `${res.aciertos} respuestas correctas de ${res.total}.` }),
+      el("p", { class: "muted", style: "margin:4px 0 0", text: entregaTxt }))));
+  cont.append(cab);
+
+  const det = el("div", { class: "card" }, el("h2", { text: "Corrección" }));
+  (res.detalle || []).forEach((p, i) => {
+    const d = el("div", { class: "det " + (p.ok ? "ok" : "bad") });
+    d.append(el("p", {}, el("span", { class: "marca", text: p.ok ? "✓" : "✗" }), el("strong", { text: `${i + 1}. ` }), document.createTextNode(p.enunciado)));
+    const tuya = p.elegida === null || p.elegida === undefined ? "Sin responder" : p.opciones[p.elegida];
+    d.append(el("p", { text: "Tu respuesta: " + tuya }));
+    if (!p.ok) d.append(el("p", { text: "Respuesta correcta: " + p.opciones[p.correcta] }));
+    if (p.explicacion) d.append(el("p", { class: "exp", text: p.explicacion }));
+    det.append(d);
+  });
+  cont.append(det);
+  mostrar("resultado");
+}
+
+/* ---------- eventos del navegador ---------- */
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && sesion && !entregando) refrescar();
+});
+window.addEventListener("online", () => {
+  conexion(true);
+  if (sesion && !entregando) { if (sucio) guardar(); refrescar(); }
+});
+window.addEventListener("offline", () => conexion(false));
+window.addEventListener("beforeunload", e => {
+  if (sucio || entregando) { e.preventDefault(); e.returnValue = ""; }
+});
+
+/* ---------- inicio ---------- */
+if (!CFG || CFG.SUPABASE_URL.includes("TU-PROYECTO")) {
+  $("#cargando-txt").textContent = "Falta configurar la conexión a Supabase (assets/config.js).";
+} else if (sesion && sesion.token) {
+  iniciarSesion();     // acceso automático: ya había ingresado en este dispositivo
+} else {
+  mostrar("ingreso");
+}
+</script>
+</body>
+</html>

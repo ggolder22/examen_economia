@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Panel docente · Examen</title>
+<link rel="stylesheet" href="/assets/estilos.css">
+<style>
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-top: 18px; overflow-x: auto; }
+  .tabs button {
+    background: none; border: none; color: var(--muted); border-radius: 0;
+    border-bottom: 3px solid transparent; padding: 10px 14px; white-space: nowrap;
+  }
+  .tabs button.activa { color: var(--primary); border-bottom-color: var(--primary); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 14px; }
+  .stat { border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+  .stat b { display: block; font-size: 1.6rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: .85rem; }
+  .estado-grande { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .estado-grande .badge { font-size: .95rem; padding: 6px 14px; }
+  .cuenta { font-size: 2rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .preg { border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 12px; }
+  .preg ol { margin: 8px 0; padding-left: 22px; }
+  .preg li.correcta { color: var(--ok); font-weight: 600; }
+  .preg .exp { color: var(--muted); font-size: .92rem; margin: 6px 0 0; }
+  .opcion-edit { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .opcion-edit input[type=radio] { width: 20px; height: 20px; flex: none; }
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 60;
+    background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 8px; max-width: 90vw;
+  }
+  .reg { font-size: .88rem; border-bottom: 1px solid var(--border); padding: 6px 0; }
+  .reg time { color: var(--muted); margin-right: 8px; font-variant-numeric: tabular-nums; }
+  .det { border-top: 1px solid var(--border); padding: 8px 0; font-size: .93rem; }
+  .det p { margin: 2px 0; }
+  .peligro { border-color: var(--bad); }
+  td .row { flex-wrap: nowrap; gap: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap ancho">
+  <header class="row" style="justify-content:space-between">
+    <div>
+      <h1>Panel docente</h1>
+      <div class="muted" id="sub">Examen de Economía</div>
+    </div>
+    <div class="row hidden" id="usuario">
+      <span class="muted" id="usuario-email"></span>
+      <button class="secondary small" id="btn-logout" type="button">Cerrar sesión</button>
+    </div>
+  </header>
+
+  <!-- LOGIN -->
+  <section class="card hidden" id="login" style="max-width:420px">
+    <h2>Ingreso docente</h2>
+    <form id="form-login">
+      <div class="field"><label for="email">Email</label><input type="email" id="email" autocomplete="username" required></div>
+      <div class="field"><label for="pass">Contraseña</label><input type="password" id="pass" autocomplete="current-password" required></div>
+      <div class="msg error hidden" id="login-error"></div>
+      <div class="row" style="margin-top:16px"><button type="submit" id="btn-login">Ingresar</button></div>
+    </form>
+  </section>
+
+  <section class="card hidden" id="no-admin">
+    <h2>Sin permisos</h2>
+    <p>Tu usuario no está habilitado como docente. Agregalo a la tabla <code>admins</code> en Supabase (ver README).</p>
+  </section>
+
+  <div id="cargando" class="card"><div class="spinner"></div></div>
+
+  <!-- PANEL -->
+  <div id="panel" class="hidden">
+    <nav class="tabs" id="tabs">
+      <button type="button" data-tab="control" class="activa">Examen</button>
+      <button type="button" data-tab="alumnos">Alumnos y notas</button>
+      <button type="button" data-tab="preguntas">Preguntas</button>
+      <button type="button" data-tab="config">Configuración</button>
+    </nav>
+
+    <!-- CONTROL -->
+    <section class="tab" id="tab-control">
+      <div class="card">
+        <div class="estado-grande">
+          <span class="badge" id="estado-badge">—</span>
+          <span class="cuenta" id="cuenta"></span>
+        </div>
+        <p class="muted" id="estado-txt" style="margin-bottom:0"></p>
+
+        <div id="bloque-iniciar" class="hidden" style="margin-top:18px">
+          <div class="field" style="max-width:260px">
+            <label for="minutos">Tiempo disponible (minutos)</label>
+            <input type="number" id="minutos" min="1" max="600" value="40">
+          </div>
+          <div class="msg warn hidden" id="aviso-reinicio">
+            El examen ya se tomó. Si lo habilitás de nuevo, solo podrán rendir los alumnos que no tengan un examen entregado.
+          </div>
+          <div class="row" style="margin-top:14px">
+            <button type="button" id="btn-iniciar">▶ Habilitar inicio del examen</button>
+          </div>
+        </div>
+
+        <div id="bloque-curso" class="hidden" style="margin-top:18px">
+          <div class="row">
+            <button type="button" class="secondary" data-ext="5">+5 minutos</button>
+            <button type="button" class="secondary" data-ext="10">+10 minutos</button>
+            <button type="button" class="danger" id="btn-finalizar">■ Finalizar examen ahora</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Resumen</h2>
+        <div class="stats">
+          <div class="stat"><b id="s-reg">0</b><span>Registrados</span></div>
+          <div class="stat"><b id="s-esp">0</b><span>Esperando</span></div>
+          <div class="stat"><b id="s-ren">0</b><span>Rindiendo</span></div>
+          <div class="stat"><b id="s-ent">0</b><span>Entregados</span></div>
+          <div class="stat"><b id="s-apr">0</b><span>Aprobados</span></div>
+          <div class="stat"><b id="s-prom">—</b><span>Promedio</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Enlace para los alumnos</h2>
+        <div class="row">
+          <input type="text" id="link-alumnos" readonly style="max-width:420px">
+          <button type="button" class="secondary" id="btn-copiar">Copiar</button>
+        </div>
+        <p class="muted" style="margin-bottom:0">Los alumnos pueden entrar y registrarse antes de que habilites el examen: quedan en espera y comienza solo.</p>
+      </div>
+    </section>
+
+    <!-- ALUMNOS -->
+    <section class="tab hidden" id="tab-alumnos">
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <input type="text" id="buscar" placeholder="Buscar por apellido, nombre o DNI" style="max-width:340px">
+          <button type="button" class="secondary" id="btn-csv">Descargar planilla (CSV)</button>
+        </div>
+        <div class="tabla-wrap">
+          <table class="tabla">
+            <thead><tr>
+              <th>Apellido y nombre</th><th>DNI</th><th>Estado</th>
+              <th class="num">Resp.</th><th class="num">Nota</th><th>Entrega</th><th></th>
+            </tr></thead>
+            <tbody id="tbody-alumnos"></tbody>
+          </table>
+        </div>
+        <p class="muted hidden" id="sin-alumnos">Todavía no hay alumnos registrados.</p>
+      </div>
+    </section>
+
+    <!-- PREGUNTAS -->
+    <section class="tab hidden" id="tab-preguntas">
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <h2 style="margin:0" id="preg-titulo">Preguntas</h2>
+          <button type="button" id="btn-nueva">+ Agregar pregunta</button>
+        </div>
+        <div class="msg warn hidden" id="preg-bloqueo">Mientras el examen está en curso no se pueden modificar las preguntas.</div>
+        <div id="editor" class="hidden"></div>
+        <div id="lista-preguntas"></div>
+      </div>
+    </section>
+
+    <!-- CONFIG -->
+    <section class="tab hidden" id="tab-config">
+      <div class="card">
+        <h2>Configuración del examen</h2>
+        <form id="form-config">
+          <div class="field"><label for="c-titulo">Título</label><input type="text" id="c-titulo"></div>
+          <div class="field" style="max-width:260px"><label for="c-duracion">Duración sugerida (minutos)</label><input type="number" id="c-duracion" min="1" max="600"></div>
+          <div class="field" style="max-width:260px"><label for="c-nota">Nota mínima para aprobar</label><input type="number" id="c-nota" min="1" max="10" step="0.5"></div>
+          <label class="row" style="margin-top:14px; gap:8px"><input type="checkbox" id="c-mostrar"> Mostrar la nota y la corrección al alumno cuando entrega</label>
+          <div class="row" style="margin-top:16px"><button type="submit">Guardar configuración</button></div>
+        </form>
+      </div>
+      <div class="card peligro">
+        <h2>Zona de riesgo</h2>
+        <p class="muted">Usalo después de hacer una prueba, antes del examen real. El registro de actividad no se borra.</p>
+        <div class="row">
+          <button type="button" class="danger secondary" id="btn-reset-intentos">Borrar todos los exámenes rendidos</button>
+          <button type="button" class="danger" id="btn-reset-todo">Borrar alumnos y exámenes</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div id="modal" class="modal-fondo hidden"><div class="modal" id="modal-cont"></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/assets/config.js"></script>
+<script>
+const CFG = window.EXAMEN_CONFIG;
+const sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_KEY);
+const $ = s => document.querySelector(s);
+const LETRAS = "ABCDEFGH";
+
+let datos = null;          // última respuesta de admin_estado
+let offset = 0;
+let tPoll = null, tTic = null;
+let configCargada = false;
+let sesionActiva = false;
+let editando = null;       // pregunta en edición (objeto) o null
+
+/* ---------- utilidades ---------- */
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const hora = iso => iso ? new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : "";
+const fechaHora = iso => iso ? new Date(iso).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
+const nota = n => n == null ? "—" : Number(n).toLocaleString("es-AR", { maximumFractionDigits: 1 });
+const ahora = () => Date.now() + offset;
+
+function toast(txt) {
+  const t = document.createElement("div");
+  t.className = "toast"; t.textContent = txt;
+  document.body.append(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+async function rpc(fn, args) {
+  const { data, error } = await sb.rpc(fn, args);
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+async function accion(fn, args, okMsg) {
+  try {
+    const r = await rpc(fn, args);
+    if (okMsg) toast(okMsg);
+    await cargar();
+    return r;
+  } catch (e) {
+    alert(e.message);
+    return undefined;
+  }
+}
+
+/* ---------- autenticación ---------- */
+function mostrarSolo(id) {
+  ["login", "no-admin", "cargando", "panel"].forEach(x => $("#" + x).classList.toggle("hidden", x !== id));
+}
+
+$("#form-login").addEventListener("submit", async e => {
+  e.preventDefault();
+  const err = $("#login-error");
+  err.classList.add("hidden");
+  $("#btn-login").disabled = true;
+  const { error } = await sb.auth.signInWithPassword({ email: $("#email").value.trim(), password: $("#pass").value });
+  $("#btn-login").disabled = false;
+  if (error) {
+    err.textContent = error.message.includes("Invalid") ? "Email o contraseña incorrectos." : error.message;
+    err.classList.remove("hidden");
+  }
+});
+
+$("#btn-logout").addEventListener("click", () => sb.auth.signOut());
+
+sb.auth.onAuthStateChange((_ev, session) => {
+  sesionActiva = !!session;
+  if (session) {
+    $("#usuario-email").textContent = session.user.email;
+    $("#usuario").classList.remove("hidden");
+    if (!tPoll) { mostrarSolo("cargando"); cargar(); }
+  } else {
+    clearTimeout(tPoll); tPoll = null;
+    datos = null; configCargada = false;
+    $("#usuario").classList.add("hidden");
+    mostrarSolo("login");
+  }
+});
+
+/* ---------- carga periódica ---------- */
+let cargandoAhora = false, recargar = false;
+async function cargar() {
+  if (!sesionActiva) return;
+  if (cargandoAhora) { recargar = true; return; }
+  cargandoAhora = true;
+  clearTimeout(tPoll);
+  try {
+    const d = await rpc("admin_estado", {});
+    datos = d;
+    offset = Date.parse(d.ahora) - Date.now();
+    mostrarSolo("panel");
+    render();
+  } catch (e) {
+    if (e.message.includes("NO_AUTORIZADO")) { mostrarSolo("no-admin"); cargandoAhora = false; return; }
+    toast("Problema de conexión: " + e.message);
+  }
+  cargandoAhora = false;
+  if (recargar) { recargar = false; return cargar(); }
+  if (sesionActiva) tPoll = setTimeout(cargar, 5000);
+}
+
+function render() {
+  $("#sub").textContent = datos.config.titulo;
+  renderControl();
+  renderAlumnos();
+  if (!editando) renderPreguntas();
+  if (!configCargada) cargarConfig();
+}
+
+/* ---------- pestañas ---------- */
+$("#tabs").addEventListener("click", e => {
+  const b = e.target.closest("button[data-tab]");
+  if (!b) return;
+  document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("activa", x === b));
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("hidden", t.id !== "tab-" + b.dataset.tab));
+});
+
+/* ---------- control del examen ---------- */
+function estadoAlumno(a) {
+  if (a.entregado) return "entregado";
+  if (a.tiene_intento) return "rindiendo";
+  return "esperando";
+}
+
+function renderControl() {
+  const c = datos.config, est = datos.estado;
+  const badge = $("#estado-badge");
+  badge.textContent = { no_iniciado: "NO INICIADO", en_curso: "EN CURSO", finalizado: "FINALIZADO" }[est];
+  badge.className = "badge " + { no_iniciado: "gris", en_curso: "ok", finalizado: "bad" }[est];
+
+  $("#estado-txt").textContent = {
+    no_iniciado: "Los alumnos pueden registrarse y quedan en espera hasta que habilites el examen.",
+    en_curso: `Comenzó a las ${hora(c.inicio)} y termina a las ${hora(c.fin)}. Los alumnos que entran tarde tienen el tiempo que queda.`,
+    finalizado: `Finalizó a las ${hora(c.fin)}. Los exámenes sin entregar se cierran y corrigen automáticamente.`,
+  }[est];
+
+  $("#bloque-iniciar").classList.toggle("hidden", est === "en_curso");
+  $("#bloque-curso").classList.toggle("hidden", est !== "en_curso");
+  $("#aviso-reinicio").classList.toggle("hidden", est !== "finalizado");
+  if (document.activeElement !== $("#minutos") && !$("#minutos").dataset.tocado) $("#minutos").value = c.duracion_min;
+
+  const al = datos.alumnos;
+  const ent = al.filter(a => a.entregado);
+  $("#s-reg").textContent = al.length;
+  $("#s-esp").textContent = al.filter(a => estadoAlumno(a) === "esperando").length;
+  $("#s-ren").textContent = al.filter(a => estadoAlumno(a) === "rindiendo").length;
+  $("#s-ent").textContent = ent.length;
+  $("#s-apr").textContent = ent.filter(a => Number(a.nota) >= Number(c.nota_aprobacion)).length;
+  $("#s-prom").textContent = ent.length ? nota(ent.reduce((s, a) => s + Number(a.nota), 0) / ent.length) : "—";
+
+  if (!tTic) tTic = setInterval(ticControl, 1000);
+  ticControl();
+}
+
+function ticControl() {
+  if (!datos) return;
+  const cuenta = $("#cuenta");
+  if (datos.estado !== "en_curso") { cuenta.textContent = ""; return; }
+  const s = Math.max(0, Math.ceil((Date.parse(datos.config.fin) - ahora()) / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), seg = s % 60;
+  cuenta.textContent = (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(seg).padStart(2, "0");
+  if (s === 0) cargar();
+}
+
+$("#minutos").addEventListener("input", e => { e.target.dataset.tocado = "1"; });
+
+$("#btn-iniciar").addEventListener("click", async () => {
+  const min = parseInt($("#minutos").value, 10);
+  if (!min || min < 1) return alert("Indicá el tiempo disponible en minutos.");
+  if (!confirm(`¿Habilitar el examen ahora con ${min} minutos?\n\nLos alumnos que están esperando comienzan inmediatamente.`)) return;
+  delete $("#minutos").dataset.tocado;
+  await accion("admin_iniciar", { p_minutos: min }, "Examen habilitado");
+});
+
+document.querySelectorAll("[data-ext]").forEach(b => b.addEventListener("click", () =>
+  accion("admin_extender", { p_minutos: Number(b.dataset.ext) }, `Se agregaron ${b.dataset.ext} minutos`)));
+
+$("#btn-finalizar").addEventListener("click", () => {
+  if (!confirm("¿Finalizar el examen ahora?\n\nLos alumnos que no entregaron tienen 1 minuto para enviar sus últimas respuestas y luego se corrigen automáticamente.")) return;
+  accion("admin_finalizar", {}, "Examen finalizado");
+});
+
+$("#link-alumnos").value = location.origin + "/examen/";
+$("#btn-copiar").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("#link-alumnos").value); toast("Enlace copiado"); }
+  catch { $("#link-alumnos").select(); }
+});
+
+/* ---------- alumnos ---------- */
+function hace(iso) {
+  if (!iso) return "";
+  const s = Math.round((ahora() - Date.parse(iso)) / 1000);
+  if (s < 60) return "hace " + s + " s";
+  if (s < 3600) return "hace " + Math.round(s / 60) + " min";
+  return fechaHora(iso);
+}
+
+function renderAlumnos() {
+  const q = $("#buscar").value.trim().toLowerCase();
+  const lista = datos.alumnos.filter(a => !q || `${a.apellido} ${a.nombre} ${a.dni}`.toLowerCase().includes(q));
+  const totalPreg = datos.preguntas.length;
+  const aprob = Number(datos.config.nota_aprobacion);
+  $("#sin-alumnos").classList.toggle("hidden", datos.alumnos.length > 0);
+
+  $("#tbody-alumnos").innerHTML = lista.map(a => {
+    const est = estadoAlumno(a);
+    let badge;
+    if (est === "entregado") badge = `<span class="badge ok">Entregado${a.entrega_auto ? " (auto)" : ""}</span>`;
+    else if (est === "rindiendo") {
+      const inactivo = a.ultimo_acceso && ahora() - Date.parse(a.ultimo_acceso) > 90000;
+      badge = `<span class="badge warn">Rindiendo</span>` + (inactivo ? `<br><small class="muted">sin señal ${esc(hace(a.ultimo_acceso))}</small>` : "");
+    } else badge = `<span class="badge gris">Esperando</span>`;
+    const notaTxt = a.entregado ? `<strong style="color:var(--${Number(a.nota) >= aprob ? "ok" : "bad"})">${nota(a.nota)}</strong>` : "—";
+    return `<tr>
+      <td>${esc(a.apellido)}, ${esc(a.nombre)}</td>
+      <td>${esc(a.dni)}</td>
+      <td>${badge}</td>
+      <td class="num">${a.tiene_intento ? `${a.respondidas}/${a.total ?? totalPreg}` : "—"}</td>
+      <td class="num">${notaTxt}</td>
+      <td>${a.entregado ? esc(hora(a.entregado)) : ""}</td>
+      <td><div class="row">
+        <button class="secondary small" data-acc="ver" data-dni="${esc(a.dni)}">Ver</button>
+        ${a.tiene_intento ? `<button class="secondary small" data-acc="reabrir" data-dni="${esc(a.dni)}">Nuevo intento</button>` : ""}
+        <button class="danger secondary small" data-acc="eliminar" data-dni="${esc(a.dni)}">Eliminar</button>
+      </div></td>
+    </tr>`;
+  }).join("");
+}
+
+$("#buscar").addEventListener("input", () => datos && renderAlumnos());
+
+$("#tbody-alumnos").addEventListener("click", e => {
+  const b = e.target.closest("button[data-acc]");
+  if (!b) return;
+  const a = datos.alumnos.find(x => x.dni === b.dataset.dni);
+  if (!a) return;
+  const nom = `${a.apellido}, ${a.nombre} (DNI ${a.dni})`;
+  if (b.dataset.acc === "ver") verAlumno(a.dni);
+  if (b.dataset.acc === "reabrir" &&
+      confirm(`¿Borrar el examen de ${nom} para que pueda rendir de nuevo?\n\nSolo podrá hacerlo mientras el examen esté en curso. Lo borrado queda en el registro.`))
+    accion("admin_permitir_nuevo_intento", { p_dni: a.dni }, "Intento borrado");
+  if (b.dataset.acc === "eliminar" &&
+      confirm(`¿Eliminar a ${nom} y su examen?\n\nLo borrado queda en el registro.`))
+    accion("admin_eliminar_alumno", { p_dni: a.dni }, "Alumno eliminado");
+});
+
+function numPregunta(id) {
+  const i = datos.preguntas.findIndex(p => String(p.id) === String(id));
+  return i === -1 ? "id " + id : i + 1;
+}
+
+function textoEvento(r) {
+  const d = r.datos || {};
+  switch (r.evento) {
+    case "registro": return `Se registró (${esc(d.apellido)}, ${esc(d.nombre)})`;
+    case "ingreso": return "Ingresó";
+    case "inicio_examen": return "Comenzó el examen";
+    case "respuesta": return "Respondió: " + Object.entries(d).map(([id, op]) => `preg. ${numPregunta(id)} → ${LETRAS[op] || op}`).join(", ");
+    case "entrega": return `Entregó · ${d.aciertos}/${d.total} · nota ${nota(d.nota)}`;
+    case "entrega_automatica": return `Entrega automática por tiempo · ${d.aciertos}/${d.total} · nota ${nota(d.nota)}`;
+    case "docente_borra_intento": return "La docente borró su intento";
+    default: return esc(r.evento);
+  }
+}
+
+async function verAlumno(dni) {
+  abrirModal(`<div class="spinner"></div>`);
+  let r;
+  try { r = await rpc("admin_alumno", { p_dni: dni }); }
+  catch (e) { abrirModal(`<p>${esc(e.message)}</p>`); return; }
+  const a = r.alumno, i = r.intento;
+  let html = `<div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">${esc(a.apellido)}, ${esc(a.nombre)}</h2>
+      <button class="secondary small" onclick="cerrarModal()">Cerrar</button></div>
+    <p class="muted">DNI ${esc(a.dni)} · registrado ${esc(fechaHora(a.creado))}</p>`;
+
+  if (!i) html += `<p>No comenzó el examen.</p>`;
+  else if (i.detalle) {
+    html += `<p><strong>Nota ${nota(i.nota)}</strong> · ${i.aciertos}/${i.total} correctas · entregado ${esc(fechaHora(i.entregado))}${i.entrega_auto ? " (automático)" : ""}</p>`;
+    html += i.detalle.map((p, n) => `<div class="det">
+      <p><strong style="color:var(--${p.ok ? "ok" : "bad"})">${p.ok ? "✓" : "✗"} ${n + 1}.</strong> ${esc(p.enunciado)}</p>
+      <p>Respondió: ${p.elegida == null ? "<em>sin responder</em>" : esc(LETRAS[p.elegida] + ") " + p.opciones[p.elegida])}</p>
+      ${p.ok ? "" : `<p class="muted">Correcta: ${esc(LETRAS[p.correcta] + ") " + p.opciones[p.correcta])}</p>`}
+    </div>`).join("");
+  } else {
+    html += `<p><span class="badge warn">Rindiendo</span> · comenzó ${esc(fechaHora(i.iniciado))}</p>`;
+    html += datos.preguntas.map((p, n) => {
+      const el = i.respuestas[String(p.id)];
+      return `<div class="det"><p><strong>${n + 1}.</strong> ${esc(p.enunciado)}</p>
+        <p>Respuesta actual: ${el == null ? "<em>sin responder</em>" : esc(LETRAS[el] + ") " + p.opciones[el])}</p></div>`;
+    }).join("");
+  }
+
+  html += `<h2 style="margin-top:20px">Registro de actividad</h2>` +
+    (r.registro.length ? r.registro.map(x => `<div class="reg"><time>${esc(fechaHora(x.ts))}</time>${textoEvento(x)}</div>`).join("") : `<p class="muted">Sin actividad.</p>`);
+  abrirModal(html);
+}
+
+function abrirModal(html) { $("#modal-cont").innerHTML = html; $("#modal").classList.remove("hidden"); }
+function cerrarModal() { $("#modal").classList.add("hidden"); }
+$("#modal").addEventListener("click", e => { if (e.target.id === "modal") cerrarModal(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") cerrarModal(); });
+
+$("#btn-csv").addEventListener("click", () => {
+  const aprob = Number(datos.config.nota_aprobacion);
+  const filas = [["Apellido", "Nombre", "DNI", "Estado", "Respondidas", "Correctas", "Total", "Nota", "Condición", "Entregado", "Entrega automática"]];
+  datos.alumnos.forEach(a => filas.push([
+    a.apellido, a.nombre, a.dni, estadoAlumno(a),
+    a.tiene_intento ? a.respondidas : "", a.aciertos ?? "", a.total ?? "",
+    a.nota != null ? String(a.nota).replace(".", ",") : "",
+    a.entregado ? (Number(a.nota) >= aprob ? "Aprobado" : "Desaprobado") : "",
+    a.entregado ? fechaHora(a.entregado) : "", a.entregado ? (a.entrega_auto ? "Sí" : "No") : "",
+  ]));
+  const csv = "﻿" + filas.map(f => f.map(v => `"${String(v).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  link.download = `notas_examen_${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+});
+
+/* ---------- preguntas ---------- */
+function renderPreguntas() {
+  const bloqueado = datos.estado === "en_curso";
+  $("#preg-bloqueo").classList.toggle("hidden", !bloqueado);
+  $("#btn-nueva").disabled = bloqueado;
+  $("#preg-titulo").textContent = `Preguntas (${datos.preguntas.length})`;
+  $("#lista-preguntas").innerHTML = datos.preguntas.map((p, n) => `
+    <div class="preg">
+      <div class="row" style="justify-content:space-between; align-items:flex-start; flex-wrap:nowrap">
+        <strong>${n + 1}. ${esc(p.enunciado)}</strong>
+        <div class="row" style="flex-wrap:nowrap">
+          <button class="secondary small" data-ed="${p.id}" ${bloqueado ? "disabled" : ""}>Editar</button>
+          <button class="danger secondary small" data-del="${p.id}" ${bloqueado ? "disabled" : ""}>Eliminar</button>
+        </div>
+      </div>
+      <ol type="A">${p.opciones.map((o, i) => `<li class="${i === p.correcta ? "correcta" : ""}">${esc(o)}${i === p.correcta ? " ✓" : ""}</li>`).join("")}</ol>
+      ${p.explicacion ? `<p class="exp">${esc(p.explicacion)}</p>` : ""}
+    </div>`).join("");
+}
+
+$("#lista-preguntas").addEventListener("click", e => {
+  const ed = e.target.closest("[data-ed]"), del = e.target.closest("[data-del]");
+  if (ed) abrirEditor(datos.preguntas.find(p => String(p.id) === ed.dataset.ed));
+  if (del && confirm("¿Eliminar esta pregunta?")) accion("admin_eliminar_pregunta", { p_id: Number(del.dataset.del) }, "Pregunta eliminada");
+});
+
+$("#btn-nueva").addEventListener("click", () => abrirEditor(null));
+
+function abrirEditor(p) {
+  const maxOrden = Math.max(0, ...datos.preguntas.map(x => x.orden));
+  editando = p ? { ...p, opciones: [...p.opciones] }
+               : { id: null, orden: maxOrden + 1, enunciado: "", opciones: ["", "", "", ""], correcta: 0, explicacion: "" };
+  dibujarEditor();
+  $("#lista-preguntas").classList.add("hidden");
+  $("#btn-nueva").classList.add("hidden");
+}
+
+function dibujarEditor() {
+  const p = editando;
+  const ed = $("#editor");
+  ed.innerHTML = `
+    <div class="preg">
+      <h2>${p.id ? "Editar pregunta" : "Nueva pregunta"}</h2>
+      <div class="field" style="max-width:140px"><label>Orden</label><input type="number" id="e-orden" value="${esc(p.orden)}"></div>
+      <div class="field"><label>Enunciado</label><textarea id="e-enunciado">${esc(p.enunciado)}</textarea></div>
+      <div class="field"><label>Opciones (marcá la correcta)</label>
+        ${p.opciones.map((o, i) => `<div class="opcion-edit">
+          <input type="radio" name="e-correcta" value="${i}" ${i === p.correcta ? "checked" : ""} title="Correcta">
+          <strong>${LETRAS[i]}</strong>
+          <input type="text" class="e-op" data-i="${i}" value="${esc(o)}">
+          ${p.opciones.length > 2 ? `<button type="button" class="danger secondary small" data-quitar="${i}">✕</button>` : ""}
+        </div>`).join("")}
+        ${p.opciones.length < 6 ? `<div><button type="button" class="link" id="e-agregar" style="margin-top:8px">+ agregar opción</button></div>` : ""}
+      </div>
+      <div class="field"><label>Explicación (la ve el alumno al ver su corrección)</label><textarea id="e-exp">${esc(p.explicacion || "")}</textarea></div>
+      <div class="row" style="margin-top:14px">
+        <button type="button" id="e-guardar">Guardar</button>
+        <button type="button" class="secondary" id="e-cancelar">Cancelar</button>
+      </div>
+    </div>`;
+  ed.classList.remove("hidden");
+}
+
+function leerEditor() {
+  const p = editando;
+  p.orden = parseInt($("#e-orden").value, 10) || 0;
+  p.enunciado = $("#e-enunciado").value;
+  p.explicacion = $("#e-exp").value;
+  document.querySelectorAll(".e-op").forEach(inp => { p.opciones[Number(inp.dataset.i)] = inp.value; });
+  const c = document.querySelector("input[name=e-correcta]:checked");
+  p.correcta = c ? Number(c.value) : -1;
+}
+
+function cerrarEditor() {
+  editando = null;
+  $("#editor").classList.add("hidden");
+  $("#editor").innerHTML = "";
+  $("#lista-preguntas").classList.remove("hidden");
+  $("#btn-nueva").classList.remove("hidden");
+  renderPreguntas();
+}
+
+$("#editor").addEventListener("click", async e => {
+  const t = e.target;
+  if (t.id === "e-cancelar") return cerrarEditor();
+  if (t.id === "e-agregar") { leerEditor(); editando.opciones.push(""); return dibujarEditor(); }
+  if (t.dataset.quitar !== undefined) {
+    leerEditor();
+    const i = Number(t.dataset.quitar);
+    editando.opciones.splice(i, 1);
+    if (editando.correcta === i) editando.correcta = 0;
+    else if (editando.correcta > i) editando.correcta--;
+    return dibujarEditor();
+  }
+  if (t.id === "e-guardar") {
+    leerEditor();
+    const p = editando;
+    const opciones = p.opciones.map(o => o.trim());
+    if (!p.enunciado.trim()) return alert("Escribí el enunciado.");
+    if (opciones.some(o => !o)) return alert("Completá todas las opciones o quitá las que estén vacías.");
+    if (p.correcta < 0) return alert("Marcá cuál es la opción correcta.");
+    t.disabled = true;
+    const r = await accion("admin_guardar_pregunta", {
+      p_id: p.id, p_orden: p.orden, p_enunciado: p.enunciado, p_opciones: opciones,
+      p_correcta: p.correcta, p_explicacion: p.explicacion.trim() || null,
+    }, "Pregunta guardada");
+    t.disabled = false;
+    if (r !== undefined) cerrarEditor();
+  }
+});
+
+/* ---------- configuración ---------- */
+function cargarConfig() {
+  const c = datos.config;
+  $("#c-titulo").value = c.titulo;
+  $("#c-duracion").value = c.duracion_min;
+  $("#c-nota").value = c.nota_aprobacion;
+  $("#c-mostrar").checked = c.mostrar_resultado;
+  configCargada = true;
+}
+
+$("#form-config").addEventListener("submit", async e => {
+  e.preventDefault();
+  await accion("admin_config", {
+    p_titulo: $("#c-titulo").value,
+    p_duracion: parseInt($("#c-duracion").value, 10) || null,
+    p_mostrar: $("#c-mostrar").checked,
+    p_nota_aprobacion: parseFloat($("#c-nota").value) || null,
+  }, "Configuración guardada");
+  configCargada = false;
+});
+
+function confirmarBorrado(txt) {
+  return prompt(txt + "\n\nEscribí BORRAR para confirmar:") === "BORRAR";
+}
+$("#btn-reset-intentos").addEventListener("click", () => {
+  if (confirmarBorrado("Se borran TODOS los exámenes rendidos y el examen vuelve a 'no iniciado'. Los alumnos registrados se mantienen."))
+    accion("admin_reiniciar", { p_borrar_alumnos: false }, "Exámenes borrados");
+});
+$("#btn-reset-todo").addEventListener("click", () => {
+  if (confirmarBorrado("Se borran TODOS los alumnos y sus exámenes, y el examen vuelve a 'no iniciado'."))
+    accion("admin_reiniciar", { p_borrar_alumnos: true }, "Alumnos y exámenes borrados");
+});
+
+/* ---------- inicio ---------- */
+if (CFG.SUPABASE_URL.includes("TU-PROYECTO")) {
+  $("#cargando").innerHTML = `<p>Falta configurar la conexión a Supabase en <code>assets/config.js</code>.</p>`;
+} else {
+  sb.auth.getSession().then(({ data }) => { if (!data.session) mostrarSolo("login"); });
+}
+</script>
+</body>
+</html>
