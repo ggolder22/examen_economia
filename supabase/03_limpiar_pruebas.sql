@@ -1,3 +1,6 @@
+-- ATENCION: este script borra TODOS los examenes rendidos (incluidas las notas del parcial).
+-- Usarlo solo para limpiar pruebas ANTES de tomar un examen real.
+
 -- =====================================================================
 --  LIMPIEZA DESPUÉS DE LAS PRUEBAS
 --  Deja el sistema como nuevo para el examen real.

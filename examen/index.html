@@ -121,6 +121,12 @@
   <!-- RESULTADO -->
   <section class="pantalla hidden" id="p-resultado"></section>
 
+  <!-- NO HABILITADO PARA ESTE EXAMEN -->
+  <section class="card pantalla hidden" id="p-nohabilitado">
+    <h2>No tenés que rendir este examen</h2>
+    <p>El examen que está activo ahora no está habilitado para tu DNI. Si creés que es un error, avisale a la docente.</p>
+  </section>
+
   <!-- FINALIZADO SIN RENDIR -->
   <section class="card pantalla hidden" id="p-finalizado">
     <h2>El examen finalizó</h2>
@@ -330,7 +336,10 @@ function aplicar(d) {
   }
 
   clearInterval(tReloj); tReloj = null;
-  if (d.estado === "no_iniciado") {
+  if (d.estado === "no_habilitado") {
+    mostrar("nohabilitado");
+    tRefresco = setTimeout(refrescar, 30000);
+  } else if (d.estado === "no_iniciado") {
     mostrar("espera");
     tRefresco = setTimeout(refrescar, 4000 + Math.random() * 2000);
   } else {

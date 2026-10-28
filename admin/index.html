@@ -55,6 +55,8 @@
     #tab-alumnos .card > .row, #tab-alumnos .card > .row > .row { width: 100%; }
     #tab-alumnos .card > .row > .row > button { flex: 1 1 100%; }
     #buscar { max-width: none !important; }
+    #sel-examen { max-width: none !important; flex: 1 1 100% !important; }
+    #btn-activar { width: 100%; }
 
     /* Tabla de alumnos como tarjetas */
     .tabla.cards thead { display: none; }
@@ -125,6 +127,15 @@
 
     <!-- CONTROL -->
     <section class="tab" id="tab-control">
+      <div class="card">
+        <h2>Examen activo</h2>
+        <div class="row">
+          <select id="sel-examen" style="max-width:360px; flex:1"></select>
+          <button type="button" class="secondary" id="btn-activar">Activar</button>
+        </div>
+        <p class="muted" id="hab-txt" style="margin:12px 0 8px"></p>
+        <button type="button" class="secondary small" id="btn-habilitados">Elegir alumnos habilitados</button>
+      </div>
       <div class="card">
         <div class="estado-grande">
           <span class="badge" id="estado-badge">—</span>
@@ -369,8 +380,74 @@ function estadoAlumno(a) {
   return ahora() - Date.parse(a.ultimo_acceso) < 60000 ? "esperando" : "desconectado";
 }
 
+function examenActivo() {
+  return (datos.examenes || []).find(e => e.clave === datos.config.examen) || { habilitados: null, titulo: datos.config.titulo };
+}
+const alumnosDelExamen = () => datos.alumnos.filter(a => a.habilitado !== false);
+
+function renderExamenes() {
+  const sel = $("#sel-examen");
+  if (!sel.dataset.tocado) {
+    sel.innerHTML = (datos.examenes || []).map(e =>
+      `<option value="${esc(e.clave)}">${esc(e.titulo)} · ${e.preguntas} preguntas${e.clave === datos.config.examen ? " (activo)" : ""}</option>`).join("");
+    sel.value = datos.config.examen;
+  }
+  const enCurso = datos.estado === "en_curso";
+  $("#btn-activar").disabled = enCurso || sel.value === datos.config.examen;
+  const ex = examenActivo();
+  const hab = alumnosDelExamen();
+  $("#hab-txt").textContent = ex.habilitados
+    ? `Pueden rendir solo ${hab.length} alumno(s): ${hab.map(a => a.apellido + ", " + a.nombre).join(" · ")}.`
+    : `Pueden rendir todos los alumnos de la lista (${datos.alumnos.length}).`;
+}
+
+$("#sel-examen").addEventListener("change", e => {
+  e.target.dataset.tocado = "1";
+  $("#btn-activar").disabled = datos.estado === "en_curso" || e.target.value === datos.config.examen;
+});
+
+$("#btn-activar").addEventListener("click", async () => {
+  const sel = $("#sel-examen");
+  const ex = datos.examenes.find(e => e.clave === sel.value);
+  if (!ex || !confirm(`¿Activar “${ex.titulo}”?\n\nLos alumnos verán este examen. Las notas de los demás exámenes se conservan.`)) return;
+  delete sel.dataset.tocado;
+  configCargada = false;
+  await accion("admin_cambiar_examen", { p_clave: ex.clave }, "Examen activado");
+});
+
+$("#btn-habilitados").addEventListener("click", () => {
+  const todos = !examenActivo().habilitados;
+  abrirModal(`
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">Alumnos habilitados</h2>
+      <button class="secondary small" onclick="cerrarModal()">Cerrar</button>
+    </div>
+    <p class="muted">${esc(examenActivo().titulo)}: marcá quiénes pueden rendirlo. Si marcás a todos, queda abierto para toda la lista.</p>
+    <div class="row" style="margin-bottom:8px">
+      <button type="button" class="secondary small" id="hab-todos">Marcar todos</button>
+      <button type="button" class="secondary small" id="hab-ninguno">Desmarcar todos</button>
+    </div>
+    <div id="hab-lista">${datos.alumnos.map(a => `
+      <label class="row" style="gap:10px; padding:8px 0; border-bottom:1px solid var(--border); flex-wrap:nowrap">
+        <input type="checkbox" value="${esc(a.dni)}" ${todos || a.habilitado ? "checked" : ""} style="width:20px; height:20px; flex:none">
+        <span>${a.nro ? a.nro + ". " : ""}${esc(a.apellido)}, ${esc(a.nombre)} <span class="muted">· ${esc(a.dni)}</span></span>
+      </label>`).join("")}</div>
+    <div class="row" style="margin-top:16px"><button type="button" id="hab-guardar">Guardar</button></div>`);
+  const cajas = () => [...document.querySelectorAll("#hab-lista input")];
+  $("#hab-todos").onclick = () => cajas().forEach(c => { c.checked = true; });
+  $("#hab-ninguno").onclick = () => cajas().forEach(c => { c.checked = false; });
+  $("#hab-guardar").onclick = async () => {
+    const marcados = cajas().filter(c => c.checked).map(c => c.value);
+    if (!marcados.length) return alert("Marcá al menos un alumno.");
+    const dnis = marcados.length === datos.alumnos.length ? null : marcados;
+    const r = await accion("admin_habilitados", { p_dnis: dnis }, "Alumnos habilitados guardados");
+    if (r !== undefined) cerrarModal();
+  };
+});
+
 function renderControl() {
   const c = datos.config, est = datos.estado;
+  renderExamenes();
   const badge = $("#estado-badge");
   badge.textContent = { no_iniciado: "NO INICIADO", en_curso: "EN CURSO", finalizado: "FINALIZADO" }[est];
   badge.className = "badge " + { no_iniciado: "gris", en_curso: "ok", finalizado: "bad" }[est];
@@ -386,7 +463,7 @@ function renderControl() {
   $("#aviso-reinicio").classList.toggle("hidden", est !== "finalizado");
   if (document.activeElement !== $("#minutos") && !$("#minutos").dataset.tocado) $("#minutos").value = c.duracion_min;
 
-  const al = datos.alumnos;
+  const al = alumnosDelExamen();
   const ent = al.filter(a => a.entregado);
   $("#s-reg").textContent = al.length;
   $("#s-esp").textContent = al.filter(a => estadoAlumno(a) === "esperando").length;
@@ -444,7 +521,7 @@ function hace(iso) {
 
 function renderAlumnos() {
   const q = $("#buscar").value.trim().toLowerCase();
-  const lista = datos.alumnos.filter(a => !q || `${a.apellido} ${a.nombre} ${a.dni}`.toLowerCase().includes(q));
+  const lista = alumnosDelExamen().filter(a => !q || `${a.apellido} ${a.nombre} ${a.dni}`.toLowerCase().includes(q));
   const totalPreg = datos.preguntas.length;
   const aprob = Number(datos.config.nota_aprobacion);
   $("#sin-alumnos").classList.toggle("hidden", datos.alumnos.length > 0);
@@ -605,13 +682,25 @@ function armarPlanilla(wb) {
   });
   ws.getCell("H3").font = { name: "Calibri", size: 9, bold: true };
 
-  // Alumnos: la nota del examen va en "Parcial" (columna G)
+  // Notas: parcial en la columna G y recuperatorio en la columna H
+  const exRecup = (datos.examenes || []).find(e => e.clave === "recuperatorio");
+  const tomado = clave => (datos.examenes || []).some(e => e.clave === clave && e.rendidos > 0)
+                          || (datos.config.examen === clave && datos.estado !== "no_iniciado");
+  const habilitadoEn = (a, clave) => clave === "parcial" || !!(exRecup && (!exRecup.habilitados || exRecup.habilitados.includes(a.dni)));
+  function celdaNota(a, clave) {
+    const n = (a.notas || {})[clave];
+    if (n && n.entregado) return Number(n.nota);
+    if (!habilitadoEn(a, clave) || !tomado(clave)) return "";
+    if (datos.config.examen === clave && a.tiene_intento) return "En curso";
+    return "Ausente";
+  }
   datos.alumnos.forEach((a, i) => {
     const row = ws.getRow(5 + i);
     row.getCell(1).value = a.nro ?? i + 1;
     row.getCell(2).value = nombreCompleto(a);
     row.getCell(3).value = Number(a.dni) || a.dni;
-    row.getCell(7).value = a.entregado ? Number(a.nota) : (a.tiene_intento ? "En curso" : "Ausente");
+    row.getCell(7).value = celdaNota(a, "parcial");
+    row.getCell(8).value = celdaNota(a, "recuperatorio");
     row.height = 18;
     for (let c = 1; c <= 15; c++) {
       const cell = row.getCell(c);
@@ -622,24 +711,23 @@ function armarPlanilla(wb) {
   });
 
   /* --- Hoja 2: detalle del examen --- */
-  const wd = wb.addWorksheet("Detalle del examen");
+  const wd = wb.addWorksheet("Detalle");
   wd.columns = [
     { header: "Nº", key: "nro", width: 5 },
     { header: "NOMBRE Y APELLIDO", key: "nombre", width: 36 },
     { header: "DNI", key: "dni", width: 12 },
-    { header: "Correctas", key: "ok", width: 11 },
-    { header: "Nota", key: "nota", width: 8 },
-    { header: "Condición", key: "cond", width: 14 },
-    { header: "Entrega", key: "ent", width: 20 },
+    { header: "Parcial: correctas", key: "pc", width: 18 },
+    { header: "Parcial: nota", key: "pn", width: 14 },
+    { header: "Recuperatorio: correctas", key: "rc", width: 24 },
+    { header: "Recuperatorio: nota", key: "rn", width: 20 },
   ];
+  const correctas = (a, clave) => { const n = (a.notas || {})[clave]; return n && n.entregado ? `${n.aciertos}/${n.total}` : ""; };
   datos.alumnos.forEach((a, i) => wd.addRow({
     nro: a.nro ?? i + 1,
     nombre: nombreCompleto(a),
     dni: Number(a.dni) || a.dni,
-    ok: a.entregado ? `${a.aciertos}/${a.total}` : "",
-    nota: a.entregado ? Number(a.nota) : "",
-    cond: a.entregado ? (Number(a.nota) >= aprob ? "Aprobado" : "Desaprobado") : (a.tiene_intento ? "En curso" : "Ausente"),
-    ent: a.entregado ? fechaHora(a.entregado) + (a.entrega_auto ? " (auto)" : "") : "",
+    pc: correctas(a, "parcial"), pn: celdaNota(a, "parcial"),
+    rc: correctas(a, "recuperatorio"), rn: celdaNota(a, "recuperatorio"),
   }));
   wd.eachRow((row, n) => row.eachCell(cell => {
     cell.border = bordes;
@@ -747,7 +835,7 @@ function renderPreguntas() {
   const bloqueado = datos.estado === "en_curso";
   $("#preg-bloqueo").classList.toggle("hidden", !bloqueado);
   $("#btn-nueva").disabled = bloqueado;
-  $("#preg-titulo").textContent = `Preguntas (${datos.preguntas.length})`;
+  $("#preg-titulo").textContent = `${datos.config.titulo} · ${datos.preguntas.length} preguntas`;
   $("#lista-preguntas").innerHTML = datos.preguntas.map((p, n) => `
     <div class="preg">
       <div class="preg-cab">
